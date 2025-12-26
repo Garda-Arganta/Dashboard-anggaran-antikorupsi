@@ -1,0 +1,565 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Shield, 
+  Search, 
+  Map as MapIcon, 
+  BarChart3, 
+  Activity, 
+  Lock, 
+  AlertTriangle, 
+  Link as LinkIcon, 
+  Cpu, 
+  Database,
+  ArrowRight,
+  User,
+  ExternalLink,
+  ChevronRight,
+  FileText,
+  Download,
+  Eye
+} from 'lucide-react';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  BarChart, 
+  Bar,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+
+// --- MOCK DATA ---
+const TREND_DATA = [
+  { name: '2022', fraud: 450, total: 2400 },
+  { name: '2023', fraud: 380, total: 2800 },
+  { name: '2024', fraud: 210, total: 3200 },
+];
+
+const REALISASI_KEMENKES = [
+  { name: 'Kemenkes', value: 75, color: '#3b82f6' },
+  { name: 'Kemendikbud', value: 62, color: '#10b981' },
+  { name: 'PUPR', value: 88, color: '#f59e0b' },
+  { name: 'Kemenhan', value: 45, color: '#ef4444' },
+];
+
+const TRANSAKSI_DATA = [
+  { id: 'TX-9021', tgl: '2025-10-12', ppk: 'Dinas PUPR', rekanan: 'PT. Maju Bersama', nominal: 'Rp 4.2M', status: 'Verified', hash: '0x82f...a12' },
+  { id: 'TX-9022', tgl: '2025-10-12', ppk: 'Kemenkes RI', rekanan: 'CV. Sehat Selalu', nominal: 'Rp 850jt', status: 'Verified', hash: '0x31a...b92' },
+  { id: 'TX-9023', tgl: '2025-10-11', ppk: 'Kemendikbud', rekanan: 'PT. Pustaka Indah', nominal: 'Rp 1.1M', status: 'Anomali', hash: '0x992...c41' },
+];
+
+const AI_ALERTS = [
+  { id: 'AL-001', project: 'Pembangunan Jembatan Kapuas', risk: 85, reason: 'Pola transaksi mirip proyek fiktif (Ghost Project)', model: 'Random Forest' },
+  { id: 'AL-002', project: 'Pengadaan Laptop Sekolah X', risk: 92, reason: 'Markup harga satuan (42% di atas market rate)', model: 'SVM' },
+];
+
+const App = () => {
+  const [activeTab, setActiveTab] = useState('beranda');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [inspectedProject, setInspectedProject] = useState(null);
+
+  const stats = [
+    { label: 'Total Belanja Hari Ini', value: 'Rp 12.4 T', icon: <Database className="text-blue-500" /> },
+    { label: 'Proyek Ter-Geotag', value: '8,402', icon: <MapIcon className="text-green-500" /> },
+    { label: 'Anomali Fraud AI', value: '12', icon: <AlertTriangle className="text-red-500" /> },
+    { label: 'Blocks Validated', value: '1.2M', icon: <LinkIcon className="text-purple-500" /> },
+  ];
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+    setActiveTab('alarm');
+  };
+
+  // --- SUB-COMPONENTS ---
+
+  const Navigation = () => (
+    <nav className="bg-white border-b sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16 items-center">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('beranda')}>
+            <Shield className="w-8 h-8 text-blue-900" />
+            <span className="text-xl font-bold text-blue-900 hidden md:block">INTEGRITY-CORE</span>
+          </div>
+          <div className="hidden md:flex space-x-6">
+            {['Beranda', 'Transparansi', 'Geotagging', 'Realisasi'].map((item) => (
+              <button 
+                key={item} 
+                onClick={() => setActiveTab(item.toLowerCase())}
+                className={`text-sm font-semibold transition ${activeTab === item.toLowerCase() ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-4">
+            {isLoggedIn ? (
+              <div className="flex items-center gap-3">
+                <button onClick={() => setActiveTab('alarm')} className="bg-red-50 text-red-600 p-2 rounded-full relative">
+                  <Activity className="w-5 h-5" />
+                  <span className="absolute top-0 right-0 w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
+                </button>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <button onClick={() => setIsLoggedIn(false)} className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                  <User className="w-4 h-4" /> BPK RI (Logout)
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setShowLoginModal(true)}
+                className="bg-blue-900 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center gap-2"
+              >
+                <Lock className="w-4 h-4" /> LOGIN PENGAWAS
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+
+  const Header = () => (
+    <header className="bg-blue-900 text-white py-12 px-4">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center">
+        <div className="mb-8 md:mb-0">
+          <h2 className="text-4xl font-extrabold mb-4">Sistem Antikorupsi Belanja Negara</h2>
+          <p className="text-blue-200 max-w-xl text-lg">
+            Integrasi Blockchain, AI, dan Geotagging untuk pengawasan APBN yang transparan, akuntabel, dan bebas penyimpangan.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
+          {stats.map((s, i) => (
+            <div key={i} className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/10">
+              <div className="flex items-center gap-2 mb-1">
+                {s.icon}
+                <span className="text-[10px] uppercase font-bold text-blue-200 tracking-wider">{s.label}</span>
+              </div>
+              <p className="text-xl font-bold">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </header>
+  );
+
+  const DashboardPublic = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      {/* Geotagging Proyek */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[500px]">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2"><MapIcon className="w-5 h-5 text-blue-500" /> Geotagging Proyek</h3>
+          <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded">LIVE MAP</span>
+        </div>
+        <div className="flex-1 bg-blue-50 rounded-xl relative overflow-hidden">
+            {/* Mock Map Background */}
+            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#2563eb 0.5px, transparent 0.5px)', backgroundSize: '30px 30px' }}></div>
+            
+            {/* Project Marker 1 */}
+            <div 
+              className="absolute top-1/3 left-1/4 cursor-pointer group"
+              onClick={() => setInspectedProject({ name: 'Jembatan Kapuas', progress: 75, lat: '-0.02', lng: '109.34', budget: 'Rp 45.2M' })}
+            >
+              <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg animate-bounce flex items-center justify-center">
+                <Shield className="w-3 h-3 text-white" />
+              </div>
+            </div>
+
+            {/* Project Marker 2 (Warning) */}
+            <div className="absolute bottom-1/4 right-1/3 cursor-pointer">
+              <div className="w-6 h-6 bg-red-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                <AlertTriangle className="w-3 h-3 text-white" />
+              </div>
+            </div>
+
+            {inspectedProject && (
+              <div className="absolute bottom-4 left-4 right-4 bg-white p-4 rounded-xl shadow-2xl border border-blue-100 animate-in slide-in-from-bottom duration-300">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-bold text-sm">{inspectedProject.name}</h4>
+                    <p className="text-[10px] text-gray-500 font-mono">{inspectedProject.lat}, {inspectedProject.lng}</p>
+                  </div>
+                  <button onClick={() => setInspectedProject(null)} className="text-gray-400 hover:text-gray-600">×</button>
+                </div>
+                <div className="flex items-center gap-4 mt-3">
+                  <div className="relative w-12 h-12 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90">
+                      <circle cx="24" cy="24" r="20" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+                      <circle cx="24" cy="24" r="20" fill="none" stroke="#3b82f6" strokeWidth="4" strokeDasharray="125.6" strokeDashoffset={125.6 * (1 - inspectedProject.progress/100)} />
+                    </svg>
+                    <span className="absolute text-[10px] font-bold">{inspectedProject.progress}%</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-gray-500">Anggaran Terealisasi</p>
+                    <p className="font-bold text-sm text-blue-600">{inspectedProject.budget}</p>
+                  </div>
+                  <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                     <LinkIcon className="w-4 h-4 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+            )}
+        </div>
+      </div>
+
+      {/* Transparansi Transaksi */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-[500px] flex flex-col">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2"><LinkIcon className="w-5 h-5 text-blue-500" /> Transaksi Blockchain</h3>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+            <input type="text" placeholder="Cari SP2D/Vendor..." className="pl-7 pr-3 py-1 bg-gray-50 border border-gray-200 rounded-md text-[10px]" />
+          </div>
+        </div>
+        <div className="overflow-auto flex-1 border rounded-xl">
+          <table className="w-full text-left text-[11px]">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="p-3 font-bold text-gray-600">Tgl SP2D</th>
+                <th className="p-3 font-bold text-gray-600">PPK / Rekanan</th>
+                <th className="p-3 font-bold text-gray-600">Nominal</th>
+                <th className="p-3 font-bold text-gray-600">Status BC</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {TRANSAKSI_DATA.map((t, i) => (
+                <tr key={i} className="hover:bg-gray-50">
+                  <td className="p-3 text-gray-500">{t.tgl}</td>
+                  <td className="p-3">
+                    <div className="font-bold">{t.ppk}</div>
+                    <div className="text-gray-500">{t.rekanan}</div>
+                  </td>
+                  <td className="p-3 font-bold text-blue-600">{t.nominal}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[9px] ${t.status === 'Verified' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {t.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button className="mt-4 w-full py-2 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-lg border border-blue-100 hover:bg-blue-100 transition">
+          Lihat Ledger Selengkapnya
+        </button>
+      </div>
+
+      {/* Realisasi Anggaran */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-blue-500" /> Realisasi Anggaran per K/L</h3>
+        <div className="h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={REALISASI_KEMENKES} layout="vertical">
+              <XAxis type="number" hide />
+              <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+              <Tooltip cursor={{ fill: '#f8fafc' }} />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                {REALISASI_KEMENKES.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Statistik Korupsi Trends */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2"><Activity className="w-5 h-5 text-blue-500" /> Tren Penyelewengan (ICW Data)</h3>
+          <span className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded">ANOMALI DETECTED</span>
+        </div>
+        <div className="h-[250px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={TREND_DATA}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip />
+              <Area type="monotone" dataKey="fraud" stroke="#ef4444" fillOpacity={0.1} fill="#ef4444" strokeWidth={2} />
+              <Area type="monotone" dataKey="total" stroke="#3b82f6" fillOpacity={0.1} fill="#3b82f6" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+
+  const InspectorPanel = () => (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Alarm Fraud AI */}
+      <div className="bg-white rounded-2xl shadow-sm border-l-4 border-l-red-600 p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold flex items-center gap-2 text-red-900">
+            <AlertTriangle className="w-6 h-6 animate-pulse" /> ALARM FRAUD DETECTION (High Priority)
+          </h3>
+          <div className="flex gap-2">
+            <button className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg font-bold">RE-TRAIN MODEL</button>
+            <button className="text-xs bg-blue-900 text-white px-3 py-1.5 rounded-lg font-bold">EXPORT ALL AUDIT TRAIL</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {AI_ALERTS.map((alert, i) => (
+            <div key={i} className="bg-red-50 border border-red-100 rounded-xl p-5 relative overflow-hidden group hover:shadow-md transition">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/5 -mr-10 -mt-10 rounded-full"></div>
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-[10px] font-extrabold bg-red-600 text-white px-2 py-0.5 rounded">RISK SCORE: {alert.risk}%</span>
+                <span className="text-[10px] font-mono text-red-400">Model: {alert.model}</span>
+              </div>
+              <h4 className="font-bold text-red-900 mb-1">{alert.project}</h4>
+              <p className="text-sm text-red-700 mb-4 bg-white/50 p-3 rounded-lg border border-red-200/50">
+                <span className="font-bold">AI Reason:</span> {alert.reason}
+              </p>
+              <div className="flex gap-2">
+                <button className="flex-1 bg-white text-red-600 text-xs font-bold py-2 rounded-lg border border-red-200 hover:bg-red-600 hover:text-white transition">Investigasi Lanjut</button>
+                <button className="px-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"><Download className="w-4 h-4" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Analisis AI Detail & Blockchain Explorer */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-blue-950 text-white p-8 rounded-3xl relative overflow-hidden shadow-xl">
+           <div className="absolute top-0 right-0 opacity-10 p-10">
+              <Cpu className="w-64 h-64" />
+           </div>
+           <h3 className="text-2xl font-bold mb-8 flex items-center gap-3"><Cpu className="text-blue-400" /> AI Internal Analysis Engine</h3>
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+              <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                 <p className="text-blue-400 text-xs font-bold uppercase mb-2">Model Accuracy</p>
+                 <p className="text-4xl font-bold">95.4%</p>
+                 <div className="mt-4 flex items-center gap-2">
+                    <div className="h-1 flex-1 bg-white/10 rounded-full">
+                       <div className="h-1 bg-blue-400 w-[95%]"></div>
+                    </div>
+                 </div>
+              </div>
+              <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                 <p className="text-blue-400 text-xs font-bold uppercase mb-2">Anomali Predicted</p>
+                 <p className="text-4xl font-bold">142 <span className="text-sm font-normal text-gray-400">/mo</span></p>
+              </div>
+              <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                 <p className="text-blue-400 text-xs font-bold uppercase mb-2">Explainable AI (SHAP)</p>
+                 <button className="text-[10px] bg-blue-500 px-3 py-1 rounded font-bold hover:bg-blue-400">OPEN LOGS</button>
+              </div>
+           </div>
+           <div className="mt-10 p-4 bg-black/30 rounded-2xl border border-white/5 font-mono text-xs text-blue-300">
+              <p className="mb-1"> {'>'} Loading training dataset... DONE</p>
+              <p className="mb-1"> {'>'} Running anomaly clustering (K-Means)... 4 clusters found</p>
+              <p className="text-red-400"> {'>'} CRITICAL: Pattern matching 82% with known corruption method #402</p>
+           </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 flex flex-col shadow-sm">
+           <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><LinkIcon className="text-blue-600" /> Blockchain Explorer</h3>
+           <div className="space-y-4 flex-1">
+              {[1, 2, 3].map((b) => (
+                <div key={b} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex gap-4">
+                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                      <Shield className="w-5 h-5" />
+                   </div>
+                   <div className="flex-1 overflow-hidden">
+                      <p className="text-xs font-bold">BLOCK #{88210 + b}</p>
+                      <p className="text-[9px] font-mono text-gray-400 truncate">Hash: 0x{Math.random().toString(16).substring(2, 10)}...</p>
+                      <div className="mt-1 flex gap-2">
+                         <span className="text-[8px] bg-green-100 text-green-700 px-1 rounded font-bold uppercase">Consensus OK</span>
+                      </div>
+                   </div>
+                </div>
+              ))}
+           </div>
+           <button className="mt-6 w-full py-3 bg-blue-900 text-white rounded-xl text-xs font-bold hover:bg-blue-800 transition">VIEW FULL ETHERSCAN V.2</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Navigation />
+      <Header />
+      
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 pb-20">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 min-h-[600px] flex flex-col">
+          {/* Tab Filter */}
+          <div className="flex border-b overflow-x-auto bg-gray-50/50">
+            {[
+              { id: 'beranda', icon: <BarChart3 />, label: 'Dashboard Publik' },
+              { id: 'transparansi', icon: <LinkIcon />, label: 'Ledger Transaksi' },
+              { id: 'geotagging', icon: <MapIcon />, label: 'Peta Geotagging' },
+              { id: 'realisasi', icon: <Activity />, label: 'Realisasi APBN' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  if (tab.id === 'alarm' && !isLoggedIn) {
+                    setShowLoginModal(true);
+                  } else {
+                    setActiveTab(tab.id);
+                  }
+                }}
+                className={`flex items-center gap-2 px-6 py-4 text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === tab.id 
+                  ? 'bg-white text-blue-900 border-b-2 border-blue-900' 
+                  : 'text-gray-500 hover:text-blue-900 hover:bg-gray-100'
+                }`}
+              >
+                {React.cloneElement(tab.icon, { className: 'w-4 h-4' })}
+                {tab.label}
+              </button>
+            ))}
+            {isLoggedIn && (
+               <button
+               onClick={() => setActiveTab('alarm')}
+               className={`flex items-center gap-2 px-6 py-4 text-xs font-bold transition-all whitespace-nowrap bg-red-50 text-red-600 ${
+                 activeTab === 'alarm' ? 'bg-red-100 border-b-2 border-red-600' : ''
+               }`}
+             >
+               <AlertTriangle className="w-4 h-4" />
+               ALARM FRAUD AI
+             </button>
+            )}
+          </div>
+
+          <div className="p-8 flex-1">
+            {activeTab === 'beranda' && <DashboardPublic />}
+            {activeTab === 'transparansi' && (
+               <div className="max-w-4xl mx-auto py-10">
+                  <div className="text-center mb-10">
+                     <h2 className="text-2xl font-bold mb-2">Transparansi Ledger SP2D</h2>
+                     <p className="text-gray-500">Data real-time sinkronisasi SAKTI ke Distributed Ledger Technology (DLT)</p>
+                  </div>
+                  <div className="bg-white border rounded-3xl overflow-hidden shadow-sm">
+                     {TRANSAKSI_DATA.map((t, i) => (
+                        <div key={i} className="p-6 border-b hover:bg-gray-50 flex items-center justify-between">
+                           <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
+                                 <FileText />
+                              </div>
+                              <div>
+                                 <p className="font-bold">{t.rekanan}</p>
+                                 <p className="text-xs text-gray-500">Oleh: {t.ppk} | {t.tgl}</p>
+                              </div>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-lg font-bold text-blue-900">{t.nominal}</p>
+                              <div className="flex items-center gap-2 justify-end">
+                                 <span className="text-[10px] font-mono text-gray-400">{t.hash}</span>
+                                 <ExternalLink className="w-3 h-3 text-blue-400" />
+                              </div>
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+               </div>
+            )}
+            {activeTab === 'geotagging' && (
+              <div className="flex flex-col h-[600px]">
+                 <div className="bg-blue-50 p-4 rounded-2xl mb-4 border border-blue-100 flex justify-between items-center">
+                    <p className="text-sm text-blue-800 font-bold">Menampilkan 4,502 Titik Proyek Fisik APBN 2025</p>
+                    <div className="flex gap-2">
+                       <button className="bg-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm">FILTER WILAYAH</button>
+                       <button className="bg-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm">PUPR ONLY</button>
+                    </div>
+                 </div>
+                 <div className="flex-1 bg-gray-200 rounded-3xl relative overflow-hidden border-4 border-white shadow-inner">
+                    <div className="absolute inset-0 bg-blue-100">
+                       <div className="absolute inset-0 opacity-40" style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/cubes.png")'}}></div>
+                       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-300 font-bold text-4xl opacity-20">MAP INTERFACE SIMULATION</div>
+                    </div>
+                    {/* Markers */}
+                    <div className="absolute top-1/4 left-1/3 w-8 h-8 bg-blue-600 rounded-full border-4 border-white shadow-xl animate-bounce"></div>
+                    <div className="absolute bottom-1/3 right-1/4 w-8 h-8 bg-green-600 rounded-full border-4 border-white shadow-xl"></div>
+                 </div>
+              </div>
+            )}
+            {activeTab === 'alarm' && isLoggedIn && <InspectorPanel />}
+          </div>
+        </div>
+      </main>
+
+      <footer className="bg-white border-t py-12 px-4 mt-auto">
+         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+            <div className="col-span-1 md:col-span-2">
+               <div className="flex items-center gap-2 mb-6">
+                  <Shield className="w-8 h-8 text-blue-900" />
+                  <span className="text-xl font-bold text-blue-900 tracking-tight">INTEGRITY-CORE</span>
+               </div>
+               <p className="text-gray-500 text-sm leading-relaxed mb-6 max-w-md">
+                  Portal transparansi belanja negara berbasis teknologi masa depan. Dikembangkan untuk memastikan setiap rupiah pajak rakyat kembali dalam bentuk pembangunan yang nyata dan bebas korupsi.
+               </p>
+               <div className="flex gap-4">
+                  <div className="bg-gray-100 p-2 rounded-lg"><User className="w-5 h-5 text-gray-400" /></div>
+                  <div className="bg-gray-100 p-2 rounded-lg"><Activity className="w-5 h-5 text-gray-400" /></div>
+                  <div className="bg-gray-100 p-2 rounded-lg"><MapIcon className="w-5 h-5 text-gray-400" /></div>
+               </div>
+            </div>
+            <div>
+               <h4 className="font-bold text-blue-900 mb-6 uppercase tracking-widest text-xs">Regulasi & Sumber</h4>
+               <ul className="space-y-4 text-sm text-gray-600">
+                  <li className="hover:text-blue-600 cursor-pointer flex items-center gap-2"><ChevronRight className="w-3 h-3" /> UU No. 17 Tahun 2003</li>
+                  <li className="hover:text-blue-600 cursor-pointer flex items-center gap-2"><ChevronRight className="w-3 h-3" /> PMK No. 171/2025</li>
+                  <li className="hover:text-blue-600 cursor-pointer flex items-center gap-2"><ChevronRight className="w-3 h-3" /> SPAN / SAKTI Kemenkeu</li>
+                  <li className="hover:text-blue-600 cursor-pointer flex items-center gap-2"><ChevronRight className="w-3 h-3" /> Dashboard ICW</li>
+               </ul>
+            </div>
+            <div>
+               <h4 className="font-bold text-blue-900 mb-6 uppercase tracking-widest text-xs">Partisipasi Publik</h4>
+               <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+                  <p className="text-xs text-blue-800 font-bold mb-4">Laporkan Temuan Lapangan:</p>
+                  <button className="w-full bg-blue-900 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-blue-900/20">WBS KEMENKEU</button>
+                  <p className="text-[10px] text-gray-400 mt-4 text-center">Menuju Indonesia Emas 2045</p>
+               </div>
+            </div>
+         </div>
+      </footer>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-blue-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-300">
+            <div className="bg-blue-900 p-8 text-center text-white relative">
+               <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-white/50 hover:text-white text-xl">×</button>
+               <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
+                  <Shield className="w-8 h-8" />
+               </div>
+               <h3 className="text-xl font-bold">Portal Lembaga Pengawas</h3>
+               <p className="text-blue-200 text-xs">BPK, BPKP, & Inspektorat Jenderal</p>
+            </div>
+            <form onSubmit={handleLogin} className="p-8 space-y-6">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">Email Kedinasan</label>
+                <div className="relative">
+                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                   <input type="text" placeholder="username@bpk.go.id" className="w-full pl-10 pr-4 py-3 bg-gray-50 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-2">Passphrase / Token</label>
+                <div className="relative">
+                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                   <input type="password" placeholder="••••••••" className="w-full pl-10 pr-4 py-3 bg-gray-50 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" required />
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-blue-900 text-white py-4 rounded-xl font-bold shadow-xl shadow-blue-900/20 hover:bg-blue-800 transition">AUTHENTICATE & ENTER</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
+
