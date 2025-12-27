@@ -3,572 +3,294 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integritas - Pengawasan Anggaran Nasional</title>
-    
-    <!-- Tailwind CSS -->
+    <title>Sistem Integrasi Blockchain, AI & Geotagging</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            -webkit-tap-highlight-color: transparent; 
-            scroll-behavior: smooth;
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .nav-btn.active { background-color: #2563eb; color: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; overflow: hidden; }
+        .node { stroke: #fff; stroke-width: 2px; transition: r 0.3s ease; }
+        .link { stroke: #94a3b8; stroke-opacity: 0.6; stroke-width: 1.5px; }
+        .tooltip { position: absolute; pointer-events: none; transition: opacity 0.2s; }
+        .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
         
-        /* Animasi Pin */
-        .pin-marker { cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform-origin: center bottom; }
-        .pin-marker:hover { transform: scale(1.3); filter: drop-shadow(0 0 12px rgba(0,0,0,0.4)); }
-        
-        .map-container {
-            /* Background utama menggunakan SVG yang Anda berikan */
-            background-image: url('https://raw.githubusercontent.com/Garda-Arganta/Dashboard-anggaran-antikorupsi/refs/heads/main/Tambahkan%20sedikit%20teks%20isi.svg');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            min-height: 550px;
-            position: relative;
-        }
-
-        /* Overlay untuk membantu keterbacaan peta jika background terlalu ramai */
-        .map-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(255, 255, 255, 0.1);
-            pointer-events: none;
-        }
-
-        /* Modal / Message Box Style */
-        .custom-alert {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        
-        /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        /* Fix getar/jitter: matikan pointer events pada label saat drag */
+        .dragging text { pointer-events: none; }
     </style>
 </head>
-<body class="bg-[#f8fafc] text-slate-900">
+<body class="bg-slate-50 text-slate-900 h-screen flex flex-col">
 
-    <div class="min-h-screen flex flex-col lg:flex-row overflow-x-hidden">
+    <!-- Header & Navigasi -->
+    <header class="glass-panel px-6 py-4 flex justify-between items-center z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white">
+                <i data-lucide="shield-check"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-none">IntegritySystem v2.0</h1>
+                <p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Monitoring Belanja Negara</p>
+            </div>
+        </div>
         
-        <!-- HEADER MOBILE -->
-        <header class="lg:hidden bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-            <div class="flex items-center gap-3">
-                <div class="bg-blue-600 p-2 rounded-lg text-white">
-                    <i data-lucide="shield-check" class="w-5 h-5"></i>
-                </div>
-                <h1 class="font-black text-lg tracking-tighter uppercase leading-none">INTEGRITAS</h1>
-            </div>
-            <button id="mobileMenuBtn" class="p-2 text-slate-600 bg-slate-100 rounded-xl" onclick="toggleSidebar()">
-                <i data-lucide="menu" class="w-6 h-6"></i>
+        <nav class="flex gap-6">
+            <button onclick="switchTab('visualizer')" id="btn-visualizer" class="flex items-center gap-2 font-medium tab-active transition-all py-2 px-1">
+                <i data-lucide="network" class="w-4 h-4"></i> Visualisasi
             </button>
-        </header>
+            <button onclick="switchTab('transactions')" id="btn-transactions" class="flex items-center gap-2 font-medium text-slate-500 hover:text-blue-600 transition-all py-2 px-1">
+                <i data-lucide="database" class="w-4 h-4"></i> Transaksi Blockchain
+            </button>
+            <button onclick="toggleHelp()" class="flex items-center gap-2 font-medium text-slate-500 hover:text-blue-600 transition-all py-2 px-1">
+                <i data-lucide="help-circle" class="w-4 h-4"></i> Pusat Bantuan
+            </button>
+        </nav>
+    </header>
 
-        <!-- SIDEBAR -->
-        <aside id="sidebar" class="fixed lg:sticky top-0 left-0 h-full bg-white border-r border-slate-200 z-[60] transition-all duration-300 -translate-x-full lg:translate-x-0 w-80">
-            <div class="p-8 hidden lg:flex items-center gap-4">
-                <div class="bg-blue-600 p-3 rounded-2xl text-white shadow-xl shadow-blue-100">
-                    <i data-lucide="shield-alert" class="w-6 h-6"></i>
-                </div>
-                <div>
-                    <h1 class="font-black text-xl tracking-tighter uppercase leading-none">INTEGRITAS</h1>
-                    <p class="text-[9px] text-blue-500 font-extrabold uppercase tracking-widest mt-1">Sistem Pengawasan Terintegrasi</p>
-                </div>
-            </div>
-
-            <nav class="px-6 mt-4 space-y-1 overflow-y-auto max-h-[calc(100vh-150px)] pb-20 lg:pb-0" id="mainNav">
-                <p class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utama</p>
-                <button onclick="switchTab('ringkasan')" class="nav-btn active flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="ringkasan">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                    <span class="font-bold text-sm">Ringkasan Audit</span>
-                </button>
-                <button onclick="switchTab('geotagging')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="geotagging">
-                    <i data-lucide="map" class="w-5 h-5"></i>
-                    <span class="font-bold text-sm">Geotagging</span>
-                </button>
-                <button onclick="switchTab('apbn')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="apbn">
-                    <i data-lucide="landmark" class="w-5 h-5"></i>
-                    <span class="font-bold text-sm">Realisasi APBN</span>
-                </button>
-
-                <p class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-6 mb-2">Perencanaan</p>
-                <button onclick="switchTab('rencana')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="rencana">
-                    <i data-lucide="calendar-days" class="w-5 h-5"></i>
-                    <span class="font-bold text-sm">Rencana Proyek</span>
-                </button>
-                <button onclick="switchTab('analisis')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="analisis">
-                    <i data-lucide="brain-circuit" class="w-5 h-5"></i>
-                    <span class="font-bold text-sm">Analisis Risiko AI</span>
-                </button>
-            </nav>
-        </aside>
-
-        <!-- MAIN CONTENT -->
-        <main class="flex-1 p-4 lg:p-10 max-w-[1600px] mx-auto w-full">
+    <!-- Main Content Area -->
+    <main class="flex-1 relative overflow-hidden">
+        
+        <!-- Tab 1: Visualizer -->
+        <div id="tab-visualizer" class="absolute inset-0 block">
+            <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
             
-            <!-- TAB: RINGKASAN -->
-            <div id="ringkasan" class="tab-content active space-y-8 animate-in fade-in duration-500">
-                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Anggaran Audit</p>
-                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Rp 842.2 T</h3>
+            <!-- Side Info Panel -->
+            <div class="absolute top-6 left-6 w-80 flex flex-col gap-4">
+                <div class="glass-panel rounded-2xl p-5 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                        <i data-lucide="activity" class="text-blue-500 w-4 h-4"></i> Status AI
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-slate-500">Akurasi Deteksi</span>
+                            <span class="font-semibold text-green-600">98.4%</span>
                         </div>
-                        <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl"><i data-lucide="pie-chart"></i></div>
-                    </div>
-                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Markup Terdeteksi</p>
-                            <h3 class="text-2xl font-black text-red-600 tracking-tight">Rp 12.4 T</h3>
+                        <div class="w-full bg-slate-200 rounded-full h-1.5">
+                            <div class="bg-green-500 h-1.5 rounded-full" style="width: 98%"></div>
                         </div>
-                        <div class="bg-red-50 text-red-600 p-4 rounded-2xl"><i data-lucide="trending-up"></i></div>
-                    </div>
-                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Laporan Publik</p>
-                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">1,240</h3>
-                        </div>
-                        <div class="bg-indigo-50 text-indigo-600 p-4 rounded-2xl"><i data-lucide="message-square"></i></div>
-                    </div>
-                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                        <div>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Skor Transparansi</p>
-                            <h3 class="text-2xl font-black text-emerald-600 tracking-tight">A+ (94.2)</h3>
-                        </div>
-                        <div class="bg-emerald-50 text-emerald-600 p-4 rounded-2xl"><i data-lucide="award"></i></div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
-                    <div class="p-6 border-b border-slate-50 flex justify-between items-center">
-                        <h3 class="font-black text-slate-800 text-xs uppercase tracking-widest">Aktivitas Audit Proyek Terbaru</h3>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                <tr>
-                                    <th class="px-8 py-4">Satuan Kerja / Proyek</th>
-                                    <th class="px-8 py-4">Pagu Anggaran</th>
-                                    <th class="px-8 py-4">Risiko AI</th>
-                                    <th class="px-8 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-50" id="auditTableBody"></tbody>
-                        </table>
+                        <p class="text-xs text-slate-500 italic">"Tidak ditemukan anomali mayor pada siklus anggaran saat ini."</p>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- TAB: GEOTAGGING -->
-            <div id="geotagging" class="tab-content space-y-6 animate-in fade-in">
-                <div class="flex flex-col xl:flex-row gap-8 min-h-[80vh]">
-                    <div class="flex-1 bg-white rounded-[40px] border border-slate-200 shadow-inner relative p-4 lg:p-8 flex flex-col overflow-hidden">
-                        <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-30">
-                            <div>
-                                <h2 class="text-xl font-black text-slate-800">Visualisasi Peta Nasional</h2>
-                                <p class="text-xs text-slate-400 font-bold">Pilih pin untuk detail dan pelaporan penyimpangan</p>
-                            </div>
-                            <div class="flex gap-2">
-                                <span class="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">● Normal</span>
-                                <span class="flex items-center gap-1 text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-lg border border-orange-100">● Waspada</span>
-                                <span class="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-lg border border-red-100">● Bahaya</span>
-                            </div>
-                        </div>
-                        
-                        <div class="flex-1 map-container rounded-3xl border border-slate-100 bg-slate-50">
-                            <div class="map-overlay"></div>
-                            <!-- Overlay SVG untuk interaksi node -->
-                            <svg viewBox="0 0 1000 450" class="w-full h-full relative z-20" id="mapSvg">
-                                <g id="mapPins"></g>
-                            </svg>
-                        </div>
+        <!-- Tab 2: Transactions List -->
+        <div id="tab-transactions" class="absolute inset-0 hidden bg-white overflow-y-auto p-8">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-3xl font-extrabold text-slate-900">Buku Besar Transaksi</h2>
+                        <p class="text-slate-500">Data real-time dari Ledger Blockchain Pemerintah</p>
                     </div>
-
-                    <!-- Panel Detail Geotagging -->
-                    <div id="geoDetail" class="xl:w-[450px] bg-white rounded-[40px] p-8 shadow-2xl border border-slate-100 hidden overflow-y-auto max-h-[85vh] sticky top-10 transition-all">
-                        <!-- Content injected by JS -->
-                    </div>
-                    
-                    <!-- Placeholder Detail -->
-                    <div id="geoPlaceholder" class="xl:w-[450px] bg-slate-50/50 rounded-[40px] p-10 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
-                        <div class="bg-white p-6 rounded-full shadow-sm mb-4">
-                            <i data-lucide="mouse-pointer-2" class="w-8 h-8 text-slate-300"></i>
-                        </div>
-                        <h4 class="font-bold text-slate-400">Pilih Node Proyek</h4>
-                        <p class="text-xs text-slate-400 mt-2">Klik salah satu pin pada peta untuk melihat detail pengawasan dan formulir laporan.</p>
+                    <div class="bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 flex items-center gap-3">
+                        <span class="relative flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                        </span>
+                        <span class="text-sm font-medium text-blue-700">Syncing Block #842,102</span>
                     </div>
                 </div>
-            </div>
 
-            <!-- TAB: APBN -->
-            <div id="apbn" class="tab-content space-y-8 animate-in fade-in">
-                <div class="bg-white rounded-[40px] p-10 border border-slate-100 shadow-sm">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
-                        <div>
-                            <h2 class="text-2xl font-black text-slate-800 tracking-tight">Monitor Realisasi APBN 2024</h2>
-                            <p class="text-slate-400 font-bold text-sm">Visualisasi perbandingan pagu vs realisasi blockchain</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8" id="apbnGrid"></div>
+                <div class="overflow-hidden border border-slate-200 rounded-xl shadow-sm">
+                    <table class="w-full text-left border-collapse bg-white">
+                        <thead>
+                            <tr class="bg-slate-50 border-bottom border-slate-200">
+                                <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Tanggal & Waktu</th>
+                                <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Program / Instansi</th>
+                                <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider text-right">Nilai Transaksi</th>
+                                <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Blockchain Hash</th>
+                                <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-body" class="divide-y divide-slate-100">
+                            <!-- Data diisi via JS -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        </div>
+    </main>
 
-            <!-- TAB: RENCANA PROYEK -->
-            <div id="rencana" class="tab-content space-y-8 animate-in fade-in">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div class="lg:col-span-3 bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm">
-                        <h3 class="font-black text-slate-800 text-sm uppercase tracking-widest mb-8">Pipeline Proyek Strategis (Pra-Tender)</h3>
-                        <div class="space-y-4" id="rencanaList"></div>
-                    </div>
-                    <div class="bg-blue-600 rounded-[40px] p-8 text-white">
-                        <i data-lucide="info" class="w-10 h-10 mb-6 opacity-50"></i>
-                        <h4 class="font-black text-lg mb-4">Pencegahan Dini</h4>
-                        <p class="text-sm opacity-80 leading-relaxed font-medium">Monitoring sejak tahap perencanaan menggunakan AI untuk mencegah terjadinya pengaturan spesifikasi yang mengarah pada vendor tertentu.</p>
-                    </div>
+    <!-- Overlay: Pusat Bantuan -->
+    <div id="help-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i data-lucide="help-circle" class="text-blue-500"></i> Pusat Bantuan
+                </h3>
+                <button onclick="toggleHelp()" class="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                    <i data-lucide="x" class="w-5 h-5 text-slate-500"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div class="space-y-2">
+                    <h4 class="font-bold text-slate-800">Bagaimana cara membaca visualisasi?</h4>
+                    <p class="text-sm text-slate-600">Setiap lingkaran (node) mewakili entitas atau program. Hubungan (garis) menunjukkan aliran dana. Warna merah menandakan anomali yang dideteksi oleh AI.</p>
+                </div>
+                <div class="space-y-2">
+                    <h4 class="font-bold text-slate-800">Apa itu Blockchain Hash?</h4>
+                    <p class="text-sm text-slate-600">ID unik yang tidak dapat diubah untuk setiap transaksi. Anda dapat memverifikasi keaslian data dengan mengeklik hash tersebut di menu Transaksi.</p>
+                </div>
+                <div class="space-y-2">
+                    <h4 class="font-bold text-slate-800">Bug Jitter/Getar</h4>
+                    <p class="text-sm text-slate-600 text-blue-600 font-medium italic">Update: Masalah getar pada node saat diklik telah diperbaiki dengan mengunci posisi simulasi saat interaksi pengguna dilakukan.</p>
+                </div>
+                <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-100 text-xs text-yellow-800">
+                    Sistem ini merupakan prototipe integrasi Blockchain, AI, dan Geotagging untuk pengawasan belanja negara yang transparan.
                 </div>
             </div>
-
-            <!-- TAB: ANALISIS AI -->
-            <div id="analisis" class="tab-content space-y-8 animate-in fade-in">
-                <div class="bg-white rounded-[40px] p-8 lg:p-10 border border-slate-100 shadow-sm">
-                    <h2 class="text-2xl font-black text-slate-800 mb-8 tracking-tight">Analisis Risiko Red-Flag AI Engine</h2>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10" id="analisisGrid"></div>
-                </div>
+            <div class="p-4 bg-slate-50 flex justify-end">
+                <button onclick="toggleHelp()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700">Tutup</button>
             </div>
-
-        </main>
+        </div>
     </div>
 
-    <!-- UI ALERTS -->
-    <div id="alertContainer"></div>
-
     <script>
-        // DATA MASTER (Disesuaikan dengan Geotagging Peta Indonesia Dasar)
-        const PROYEK_DATA = [
-            { id: 1, nama: "Jembatan Mahakam IV", kategori: "Infrastruktur", status: "Normal", progress: 85, anggaran: 120000000000, lokasi: "Kalimantan Timur", kordinat: [520, 210], anomali: 0.5, vendor: "PT. Adi Karya", alasanAi: "Harga bahan baku sesuai dengan indeks harga konstruksi regional terkini.", foto: "🏗️", tglUpdate: "26 Des 2023" },
-            { id: 2, nama: "Puskesmas Melati", kategori: "Kesehatan", status: "Waspada", progress: 40, anggaran: 2500000000, lokasi: "Jawa Barat", kordinat: [205, 305], anomali: 15.2, vendor: "CV. Bangun Pagi", alasanAi: "Terdapat kemiripan pola harga antara vendor ini dengan sub-kontraktor di proyek lain.", foto: "🏥", tglUpdate: "24 Des 2023" },
-            { id: 3, nama: "Pengadaan Buku Perpusnas", kategori: "Pendidikan", status: "Bahaya", progress: 10, anggaran: 15000000000, lokasi: "DKI Jakarta", kordinat: [190, 290], anomali: 45.8, vendor: "CV. Cetak Cepat", alasanAi: "Harga satuan buku di atas 45% rata-rata pasar nasional. Terdeteksi manipulasi spek.", foto: "📚", tglUpdate: "20 Des 2023" },
-            { id: 4, nama: "Irigasi Desa Baru", kategori: "Pertanian", status: "Normal", progress: 60, anggaran: 8000000000, lokasi: "Jawa Tengah", kordinat: [235, 315], anomali: 2.1, vendor: "PT. Sumber Air", alasanAi: "Alokasi biaya logistik terpantau efisien berdasarkan jarak lokasi.", foto: "🌾", tglUpdate: "27 Des 2023" },
-            { id: 5, nama: "GOR Medan Baru", kategori: "Fasilitas Publik", status: "Waspada", progress: 25, anggaran: 45000000000, lokasi: "Sumatera Utara", kordinat: [80, 110], anomali: 12.5, vendor: "PT. Jaya Raya", alasanAi: "Progress fisik di lapangan tidak sesuai klaim penyerapan dana termin pertama.", foto: "🏟️", tglUpdate: "25 Des 2023" },
-            { id: 6, nama: "RSUD Papua Barat", kategori: "Kesehatan", status: "Normal", progress: 55, anggaran: 210000000000, lokasi: "Manokwari", kordinat: [880, 240], anomali: 1.2, vendor: "PT. Papua Sejahtera", alasanAi: "Audit lapangan menunjukkan kualitas beton sesuai standar SNI.", foto: "🏢", tglUpdate: "26 Des 2023" },
+        // Mock Data Transaksi
+        const transactions = [
+            { date: '2025-10-24 09:15:22', program: 'Pembangunan Jembatan Desa A', amount: 'Rp 4.500.000.000', hash: '0x74a...8e21', status: 'Verified' },
+            { date: '2025-10-24 11:30:05', program: 'Pengadaan Alat Kesehatan RSUD', amount: 'Rp 1.250.000.000', hash: '0x1c9...b4f3', status: 'Verified' },
+            { date: '2025-10-23 14:45:10', program: 'Subsidi Pupuk Petani Lokal', amount: 'Rp 890.000.000', hash: '0xfa3...22c1', status: 'Verified' },
+            { date: '2025-10-23 16:20:45', program: 'Beasiswa Pendidikan Tinggi', amount: 'Rp 2.100.000.000', hash: '0x9db...7a4e', status: 'Warning', flag: true },
+            { date: '2025-10-22 08:10:33', program: 'Perbaikan Irigasi Sawah', amount: 'Rp 560.000.000', hash: '0x334...ff1a', status: 'Verified' }
         ];
 
-        const APBN_DATA = [
-            { kementrian: "Kemen. PUPR", pagu: 146.9, realisasi: 112.4, color: "blue", ket: "Infrastruktur & Pemukiman" },
-            { kementrian: "Kemen. Kesehatan", pagu: 178.7, realisasi: 145.2, color: "emerald", ket: "Kesehatan Masyarakat" },
-            { kementrian: "Kemen. Pendidikan", pagu: 612.2, realisasi: 489.1, color: "indigo", ket: "Pendidikan Nasional" },
-            { kementrian: "Kemen. Keuangan", pagu: 45.2, realisasi: 38.4, color: "slate", ket: "Manajemen Keuangan" },
-        ];
+        // Inisialisasi Lucide Icons
+        lucide.createIcons();
 
-        const RENCANA_PROYEK = [
-            { nama: "Pembangunan Tol Trans Papua Segmen 4", nilai: "Rp 3.2 T", tgl: "Jan 2024", risiko: "Rendah" },
-            { nama: "Digitalisasi Sekolah Menengah Timur", nilai: "Rp 450 M", tgl: "Feb 2024", risiko: "Tinggi (Markup)" },
-            { nama: "Pusat Riset Vaksin Nasional", nilai: "Rp 1.2 T", tgl: "Maret 2024", risiko: "Sedang" },
-        ];
-
-        const formatRupiah = (num) => "Rp " + (num / 1e9).toFixed(1) + " M";
-
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('-translate-x-full');
-        }
-
-        function showAlert(msg, type='success') {
-            const id = Date.now();
-            const container = document.getElementById('alertContainer');
-            const color = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
-            const html = `
-                <div id="alert-${id}" class="custom-alert ${color} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-                    <i data-lucide="${type === 'success' ? 'check-circle' : 'alert-triangle'}" class="w-5 h-5"></i>
-                    <p class="font-bold text-sm">${msg}</p>
-                </div>
-            `;
-            container.insertAdjacentHTML('beforeend', html);
-            lucide.createIcons();
-            setTimeout(() => {
-                const el = document.getElementById(`alert-${id}`);
-                if(el) el.remove();
-            }, 3000);
-        }
-
-        // LOGIC: SWITCH TAB
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                if(btn.getAttribute('data-tab') === tabId) btn.classList.add('active');
-                else btn.classList.remove('active');
+        // Fungsi Tab Switching
+        function switchTab(tab) {
+            const tabs = ['visualizer', 'transactions'];
+            tabs.forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`btn-${t}`).classList.remove('tab-active', 'text-blue-600');
+                document.getElementById(`btn-${t}`).classList.add('text-slate-500');
             });
-
-            // Close mobile sidebar on switch
-            if (window.innerWidth < 1024) {
-                document.getElementById('sidebar').classList.add('-translate-x-full');
-            }
-            window.scrollTo(0, 0);
-        }
-
-        // RENDER: RINGKASAN AUDIT
-        function renderAuditTable() {
-            const tbody = document.getElementById('auditTableBody');
-            tbody.innerHTML = PROYEK_DATA.map(p => `
-                <tr class="hover:bg-slate-50 transition-all cursor-pointer group" onclick="switchTab('geotagging'); showGeoDetail(${p.id})">
-                    <td class="px-8 py-5">
-                        <p class="text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors">${p.nama}</p>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">${p.vendor}</p>
-                    </td>
-                    <td class="px-8 py-5 text-sm font-bold text-slate-600">${formatRupiah(p.anggaran)}</td>
-                    <td class="px-8 py-5">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-black ${p.anomali > 20 ? 'text-red-500' : 'text-blue-600'}">${p.anomali}%</span>
-                            <div class="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                <div class="h-full ${p.anomali > 20 ? 'bg-red-500' : 'bg-blue-600'}" style="width: ${p.anomali}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="px-8 py-5">
-                        <span class="text-[9px] font-black px-2 py-1 rounded-lg uppercase ${p.status === 'Bahaya' ? 'bg-red-50 text-red-600' : p.status === 'Waspada' ? 'bg-orange-50 text-orange-500' : 'bg-emerald-50 text-emerald-600'}">
-                            ${p.status}
-                        </span>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // RENDER: GEOTAGGING (PIN ICONS)
-        function renderGeotagging() {
-            const pinContainer = document.getElementById('mapPins');
-            // Path SVG Pin yang diperbagus
-            const pinPath = "M12 21.7C12 21.7 20 14.3 20 8.5C20 4 16.4 0.5 12 0.5C7.6 0.5 4 4 4 8.5C4 14.3 12 21.7 12 21.7Z";
             
-            pinContainer.innerHTML = PROYEK_DATA.map(p => {
-                const color = p.status === 'Bahaya' ? '#ef4444' : p.status === 'Waspada' ? '#f59e0b' : '#10b981';
-                return `
-                    <g class="pin-marker" transform="translate(${p.kordinat[0]-12}, ${p.kordinat[1]-22})" onclick="showGeoDetail(${p.id})">
-                        <path d="${pinPath}" fill="${color}" stroke="#fff" stroke-width="1.5" />
-                        <circle cx="12" cy="8.5" r="3" fill="#fff" />
-                    </g>
-                `;
-            }).join('');
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            document.getElementById(`btn-${tab}`).classList.add('tab-active', 'text-blue-600');
+            document.getElementById(`btn-${tab}`).classList.remove('text-slate-500');
         }
 
-        // HANDLER: LAPORAN SUBMIT
-        function handleLaporanSubmit(e, proyekNama) {
-            e.preventDefault();
-            const textarea = e.target.querySelector('textarea');
-            if (textarea.value.trim().length < 10) {
-                showAlert('Mohon berikan keterangan minimal 10 karakter', 'error');
-                return;
-            }
-            
-            const btn = e.target.querySelector('button');
-            const originalText = btn.innerText;
-            btn.innerText = "PROSESING BLOCKCHAIN...";
-            btn.disabled = true;
-
-            setTimeout(() => {
-                showAlert(`Laporan anonim untuk ${proyekNama} berhasil dienkrpsi ke Ledger Blockchain.`);
-                textarea.value = '';
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }, 1500);
+        // Fungsi Modal Bantuan
+        function toggleHelp() {
+            const modal = document.getElementById('help-modal');
+            modal.classList.toggle('hidden');
+            modal.classList.toggle('flex');
         }
 
-        // DETAIL GEOTAGGING INTERACTIVE
-        function showGeoDetail(id) {
-            const p = PROYEK_DATA.find(x => x.id === id);
-            const detail = document.getElementById('geoDetail');
-            const placeholder = document.getElementById('geoPlaceholder');
-            
-            placeholder.style.display = 'none';
-            detail.classList.remove('hidden');
-            
-            // Animasi masuk
-            detail.style.opacity = '0';
-            detail.style.transform = 'translateY(10px)';
-            
-            setTimeout(() => {
-                detail.style.opacity = '1';
-                detail.style.transform = 'translateY(0)';
-            }, 50);
-
-            detail.innerHTML = `
-                <div class="flex justify-between mb-8 items-center">
-                    <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest border border-blue-100">${p.kategori}</span>
-                    <button class="p-2 hover:bg-slate-100 rounded-full transition-colors" onclick="closeGeoDetail()">
-                        <i data-lucide="x" class="w-4 h-4 text-slate-400"></i>
-                    </button>
-                </div>
-                
-                <div class="flex items-center gap-4 mb-8">
-                    <div class="w-20 h-20 bg-slate-50 border-2 border-slate-100 rounded-[2rem] flex items-center justify-center text-4xl shadow-sm">${p.foto}</div>
-                    <div>
-                        <h3 class="text-2xl font-black text-slate-800 leading-tight">${p.nama}</h3>
-                        <p class="text-xs text-slate-400 font-bold flex items-center gap-1">
-                            <i data-lucide="map-pin" class="w-3 h-3"></i> ${p.lokasi}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="space-y-4 mb-8">
-                    <div class="bg-slate-50/50 p-4 rounded-2xl space-y-3">
-                        <div class="flex justify-between text-[11px] font-bold pb-2 border-b border-slate-100">
-                            <span class="text-slate-400 uppercase tracking-wider">Nilai Proyek</span>
-                            <span class="text-slate-900">${formatRupiah(p.anggaran)}</span>
-                        </div>
-                        <div class="flex justify-between text-[11px] font-bold pb-2 border-b border-slate-100">
-                            <span class="text-slate-400 uppercase tracking-wider">Vendor</span>
-                            <span class="text-slate-900">${p.vendor}</span>
-                        </div>
-                        <div class="flex justify-between text-[11px] font-bold">
-                            <span class="text-slate-400 uppercase tracking-wider">Progres Fisik</span>
-                            <span class="text-blue-600">${p.progress}% Selesai</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="p-6 bg-blue-50/50 rounded-[2.5rem] border border-blue-100 mb-8">
-                    <div class="flex items-center gap-2 mb-3">
-                        <i data-lucide="brain-circuit" class="w-4 h-4 text-blue-600"></i>
-                        <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Temuan AI Auditor</p>
-                    </div>
-                    <p class="text-xs font-bold text-slate-700 leading-relaxed italic">"${p.alasanAi}"</p>
-                </div>
-
-                <!-- MENU LAPOR PENYIMPANGAN -->
-                <div class="bg-red-50/50 p-6 rounded-[2.5rem] border border-red-100">
-                    <div class="flex items-center gap-2 mb-4">
-                        <i data-lucide="megaphone" class="w-4 h-4 text-red-600"></i>
-                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest">Lapor Penyimpangan</p>
-                    </div>
-                    <form onsubmit="handleLaporanSubmit(event, '${p.nama}')" class="space-y-4">
-                        <textarea class="w-full bg-white border border-red-100 rounded-2xl p-4 text-xs font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Jelaskan indikasi penyimpangan yang Anda temukan di lapangan..." rows="3"></textarea>
-                        <button type="submit" class="w-full bg-red-600 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200">
-                            Kirim Laporan via Blockchain
-                        </button>
-                    </form>
-                    <p class="text-[9px] text-red-400 font-bold mt-4 text-center leading-tight">Laporan bersifat anonim dan tidak dapat dihapus oleh pihak manapun setelah tersimpan di rantai blok.</p>
-                </div>
-            `;
-            lucide.createIcons();
-            
-            // Scroll detail ke view jika di mobile
-            if(window.innerWidth < 1280) {
-                detail.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-        function closeGeoDetail() {
-            document.getElementById('geoDetail').classList.add('hidden');
-            document.getElementById('geoPlaceholder').style.display = 'flex';
-        }
-
-        // RENDER: REALISASI APBN
-        function renderAPBN() {
-            const grid = document.getElementById('apbnGrid');
-            grid.innerHTML = APBN_DATA.map(item => {
-                const persen = (item.realisasi / item.pagu * 100).toFixed(1);
-                return `
-                    <div class="p-8 bg-white rounded-[32px] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">${item.ket}</p>
-                        <h4 class="font-black text-slate-800 mb-6 text-lg tracking-tight">${item.kementrian}</h4>
-                        <div class="flex items-end gap-3 mb-6">
-                            <span class="text-3xl font-black text-slate-900 tracking-tighter">Rp ${item.realisasi} T</span>
-                            <span class="text-xs text-slate-400 font-bold mb-1.5">/ ${item.pagu} T</span>
-                        </div>
-                        <div class="w-full h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                            <div class="h-full bg-${item.color}-500 transition-all duration-1000" style="width: ${persen}%"></div>
-                        </div>
-                        <div class="mt-4 flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                            <span>Penyerapan</span>
-                            <span class="text-${item.color}-600 font-black">${persen}%</span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // RENDER: RENCANA PROYEK
-        function renderRencana() {
-            const list = document.getElementById('rencanaList');
-            list.innerHTML = RENCANA_PROYEK.map(r => `
-                <div class="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border-l-4 ${r.risiko.includes('Tinggi') ? 'border-red-500' : 'border-blue-500'}">
-                    <div>
-                        <h5 class="text-sm font-bold text-slate-800">${r.nama}</h5>
-                        <div class="flex gap-4 mt-1">
-                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><i data-lucide="tag" class="w-3 h-3"></i> ${r.nilai}</p>
-                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> ${r.tgl}</p>
-                        </div>
-                    </div>
-                    <span class="text-[9px] font-black px-3 py-1 rounded-full uppercase ${r.risiko.includes('Tinggi') ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}">
-                        ${r.risiko}
+        // Render Tabel Transaksi
+        const tableBody = document.getElementById('transaction-body');
+        transactions.forEach(tx => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-4 text-sm font-medium text-slate-700">${tx.date}</td>
+                <td class="px-6 py-4 text-sm text-slate-600">${tx.program}</td>
+                <td class="px-6 py-4 text-sm text-slate-900 font-bold text-right">${tx.amount}</td>
+                <td class="px-6 py-4 text-xs font-mono text-blue-500 bg-blue-50/50 rounded p-1">${tx.hash}</td>
+                <td class="px-6 py-4">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold ${tx.flag ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
+                        ${tx.status}
                     </span>
-                </div>
-            `).join('');
-            lucide.createIcons();
-        }
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
 
-        // RENDER: ANALISIS AI GRID
-        function renderAnalisisGrid() {
-            const grid = document.getElementById('analisisGrid');
-            grid.innerHTML = PROYEK_DATA.slice(0, 4).map(p => `
-                <div class="flex flex-col p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-                    <div class="flex justify-between items-start mb-6">
-                        <div>
-                            <p class="text-[10px] font-black text-blue-600 uppercase mb-1 tracking-widest">Detail Temuan AI</p>
-                            <h4 class="text-lg font-black text-slate-800">${p.nama}</h4>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-[10px] font-black px-3 py-1.5 rounded-xl uppercase ${p.anomali > 20 ? 'bg-red-500 text-white shadow-lg shadow-red-200' : 'bg-emerald-500 text-white shadow-lg shadow-emerald-200'}">
-                                ${p.anomali > 20 ? 'Anomali Terdeteksi' : 'Verifikasi OK'}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white p-6 rounded-[2rem] mb-6 shadow-sm border border-slate-50">
-                        <div class="flex items-center gap-2 mb-3">
-                            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Justifikasi Sistem</p>
-                        </div>
-                        <p class="text-xs font-bold text-slate-600 leading-relaxed italic">"${p.alasanAi}"</p>
-                    </div>
+        // D3 Visualizer Logic
+        const width = window.innerWidth;
+        const height = window.innerHeight;
 
-                    <div class="flex gap-4">
-                        <div class="flex-1 bg-white p-4 rounded-2xl flex flex-col items-center">
-                            <span class="text-[10px] font-black text-slate-400 uppercase">Anomali</span>
-                            <span class="text-xl font-black ${p.anomali > 20 ? 'text-red-500' : 'text-blue-600'}">${p.anomali}%</span>
-                        </div>
-                        <div class="flex-1 bg-white p-4 rounded-2xl flex flex-col items-center">
-                            <span class="text-[10px] font-black text-slate-400 uppercase">Keandalan</span>
-                            <span class="text-xl font-black text-emerald-600">99.4%</span>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            lucide.createIcons();
-        }
-
-        // INIT
-        window.onload = () => {
-            renderAuditTable();
-            renderGeotagging();
-            renderAPBN();
-            renderRencana();
-            renderAnalisisGrid();
-            lucide.createIcons();
+        const data = {
+            nodes: [
+                { id: "APBN", group: 1, size: 25 },
+                { id: "Kemenkes", group: 2, size: 18 },
+                { id: "KemenPUPR", group: 2, size: 18 },
+                { id: "Kemendikbud", group: 2, size: 18 },
+                { id: "RSUD Daerah", group: 3, size: 12 },
+                { id: "Kontraktor A", group: 3, size: 12 },
+                { id: "Beasiswa Unggul", group: 3, size: 12, anomaly: true }
+            ],
+            links: [
+                { source: "APBN", target: "Kemenkes" },
+                { source: "APBN", target: "KemenPUPR" },
+                { source: "APBN", target: "Kemendikbud" },
+                { source: "Kemenkes", target: "RSUD Daerah" },
+                { source: "KemenPUPR", target: "Kontraktor A" },
+                { source: "Kemendikbud", target: "Beasiswa Unggul" }
+            ]
         };
 
+        const svg = d3.select("#canvas-container")
+            .append("svg")
+            .attr("width", "100%")
+            .attr("height", "100%")
+            .attr("viewBox", [0, 0, width, height]);
+
+        const simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links).id(d => d.id).distance(150))
+            .force("charge", d3.forceManyBody().strength(-500))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(data.links)
+            .join("line")
+            .attr("class", "link");
+
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(data.nodes)
+            .join("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        node.append("circle")
+            .attr("r", d => d.size)
+            .attr("fill", d => d.anomaly ? "#ef4444" : "#3b82f6")
+            .attr("class", "node");
+
+        node.append("text")
+            .attr("dx", d => d.size + 5)
+            .attr("dy", 4)
+            .text(d => d.id)
+            .attr("class", "text-[10px] font-bold fill-slate-700");
+
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        // FIX GETAR: Dragging Logic yang Menstabilkan Simulasi
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+            d3.select(this).classed("dragging", true);
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+            d3.select(this).classed("dragging", false);
+        }
+
+        window.addEventListener('resize', () => {
+            svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
+        });
     </script>
 </body>
 </html>
