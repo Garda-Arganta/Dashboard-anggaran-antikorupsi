@@ -3,451 +3,512 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integritas - Dashboard Anti-Korupsi Nasional</title>
+    <title>Integritas - Pengawasan Anggaran Nasional</title>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
         body { 
             font-family: 'Plus Jakarta Sans', sans-serif; 
-            -webkit-tap-highlight-color: transparent;
+            -webkit-tap-highlight-color: transparent; 
+            scroll-behavior: smooth;
         }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .nav-btn.active { background-color: #2563eb; color: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2); }
         
-        /* Animasi untuk transisi antar tab */
-        .fade-enter { opacity: 0; transform: translateY(10px); }
-        .fade-enter-active { opacity: 1; transform: translateY(0); transition: all 300ms ease-out; }
+        /* Animasi Pin */
+        .pin-marker { cursor: pointer; transition: all 0.3s ease; transform-origin: center bottom; }
+        .pin-marker:hover { transform: scale(1.2); filter: drop-shadow(0 0 8px rgba(0,0,0,0.3)); }
         
-        /* Overlay untuk mobile detail */
-        .mobile-modal-bottom {
-            transition: transform 0.3s ease-in-out;
+        .map-container {
+            /* Menggunakan gambar peta Indonesia yang lebih detail */
+            background-image: url('https://drive.google.com/file/d/1U-5C1TvIqERsXJnSbKBnR_R47mRRzsNT/view?usp=sharing');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            min-height: 500px;
         }
+
+        /* Modal / Message Box Style */
+        .custom-alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
-<body class="bg-[#f8fafc]">
-    <div id="root"></div>
+<body class="bg-[#f8fafc] text-slate-900">
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+    <div class="min-h-screen flex flex-col lg:flex-row overflow-x-hidden">
         
-        const Icon = ({ name, size = 20, className = "" }) => {
-            const LucideIcon = lucide[name];
-            return LucideIcon ? <LucideIcon size={size} className={className} /> : null;
-        };
+        <!-- HEADER MOBILE -->
+        <header class="lg:hidden bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <h1 class="font-black text-lg tracking-tighter uppercase leading-none">INTEGRITAS</h1>
+            </div>
+            <button id="mobileMenuBtn" class="p-2 text-slate-600 bg-slate-100 rounded-xl">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+        </header>
 
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="fixed lg:sticky top-0 left-0 h-full bg-white border-r border-slate-200 z-[60] transition-all duration-300 -translate-x-full lg:translate-x-0 w-80">
+            <div class="p-8 hidden lg:flex items-center gap-4">
+                <div class="bg-blue-600 p-3 rounded-2xl text-white shadow-xl shadow-blue-100">
+                    <i data-lucide="shield-alert" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-xl tracking-tighter uppercase leading-none">INTEGRITAS</h1>
+                    <p class="text-[9px] text-blue-500 font-extrabold uppercase tracking-widest mt-1">Integritas Pengawasan Anggaran</p>
+                </div>
+            </div>
+
+            <nav class="px-6 mt-4 space-y-1 overflow-y-auto max-h-[calc(100vh-150px)] pb-20 lg:pb-0" id="mainNav">
+                <p class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utama</p>
+                <button onclick="switchTab('ringkasan')" class="nav-btn active flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="ringkasan">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">Ringkasan Audit</span>
+                </button>
+                <button onclick="switchTab('geotagging')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="geotagging">
+                    <i data-lucide="map" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">Geotagging</span>
+                </button>
+                <button onclick="switchTab('apbn')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="apbn">
+                    <i data-lucide="landmark" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">Realisasi APBN</span>
+                </button>
+
+                <p class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-6 mb-2">Perencanaan</p>
+                <button onclick="switchTab('rencana')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="rencana">
+                    <i data-lucide="calendar-days" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">Rencana Proyek</span>
+                </button>
+                <button onclick="switchTab('analisis')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="analisis">
+                    <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">Analisis Risiko AI</span>
+                </button>
+
+                <p class="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mt-6 mb-2">Lainnya</p>
+                <button onclick="switchTab('bantuan')" class="nav-btn flex items-center gap-3 px-4 py-3 rounded-xl w-full transition-all text-slate-500 hover:bg-slate-50" data-tab="bantuan">
+                    <i data-lucide="help-circle" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">Pusat Bantuan</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 p-6 lg:p-10 max-w-[1600px] mx-auto w-full">
+            
+            <!-- TAB: RINGKASAN -->
+            <div id="ringkasan" class="tab-content active space-y-8 animate-in fade-in duration-500">
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Anggaran Audit</p>
+                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Rp 842.2 T</h3>
+                        </div>
+                        <div class="bg-blue-50 text-blue-600 p-4 rounded-2xl"><i data-lucide="pie-chart"></i></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Markup Terdeteksi</p>
+                            <h3 class="text-2xl font-black text-red-600 tracking-tight">Rp 12.4 T</h3>
+                        </div>
+                        <div class="bg-red-50 text-red-600 p-4 rounded-2xl"><i data-lucide="trending-up"></i></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Laporan Publik</p>
+                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">1,240</h3>
+                        </div>
+                        <div class="bg-indigo-50 text-indigo-600 p-4 rounded-2xl"><i data-lucide="message-square"></i></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Skor Transparansi</p>
+                            <h3 class="text-2xl font-black text-emerald-600 tracking-tight">A+ (94.2)</h3>
+                        </div>
+                        <div class="bg-emerald-50 text-emerald-600 p-4 rounded-2xl"><i data-lucide="award"></i></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-slate-50">
+                        <h3 class="font-black text-slate-800 text-xs uppercase tracking-widest">Aktivitas Audit Terbaru</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                <tr>
+                                    <th class="px-8 py-4">Satuan Kerja / Proyek</th>
+                                    <th class="px-8 py-4">Pagu Anggaran</th>
+                                    <th class="px-8 py-4">Risiko AI</th>
+                                    <th class="px-8 py-4">Update Terakhir</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50" id="auditTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: GEOTAGGING -->
+            <div id="geotagging" class="tab-content space-y-6">
+                <div class="flex flex-col xl:flex-row gap-8 min-h-[75vh]">
+                    <div class="flex-1 bg-white rounded-[40px] border border-slate-200 shadow-inner relative p-4 lg:p-8 flex flex-col overflow-hidden">
+                        <div class="mb-6 flex justify-between items-center relative z-10">
+                            <div>
+                                <h2 class="text-xl font-black text-slate-800">Peta Geotagging Nasional</h2>
+                                <p class="text-xs text-slate-400 font-bold">Klik ikon pin untuk detail pengawasan lapangan</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">● Normal</span>
+                                <span class="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-lg">● Anomali</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 map-container relative rounded-3xl border border-slate-100 bg-slate-50 overflow-hidden">
+                            <!-- Overlay SVG untuk interaksi node -->
+                            <svg viewBox="0 0 1000 450" class="w-full h-full relative z-20" id="mapSvg">
+                                <g id="mapPins"></g>
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="geoDetail" class="xl:w-[450px] bg-white rounded-[40px] p-8 shadow-2xl border border-slate-100 hidden overflow-y-auto max-h-[75vh]">
+                        <!-- Detail Geotagging yang memuat form laporan -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: APBN -->
+            <div id="apbn" class="tab-content space-y-8">
+                <div class="bg-white rounded-[40px] p-10 border border-slate-100 shadow-sm">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-800 tracking-tight">Monitor Realisasi APBN 2024</h2>
+                            <p class="text-slate-400 font-bold text-sm">Visualisasi perbandingan pagu vs realisasi riil</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8" id="apbnGrid"></div>
+                </div>
+            </div>
+
+            <!-- TAB: RENCANA PROYEK -->
+            <div id="rencana" class="tab-content space-y-8">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="lg:col-span-3 bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm">
+                        <h3 class="font-black text-slate-800 text-sm uppercase tracking-widest mb-8">Pipeline Proyek Strategis (Belum Berjalan)</h3>
+                        <div class="space-y-4" id="rencanaList"></div>
+                    </div>
+                    <div class="bg-blue-600 rounded-[40px] p-8 text-white">
+                        <i data-lucide="info" class="w-10 h-10 mb-6 opacity-50"></i>
+                        <h4 class="font-black text-lg mb-4">Kenapa Ini Penting?</h4>
+                        <p class="text-sm opacity-80 leading-relaxed font-medium">Monitoring sejak tahap perencanaan mencegah terjadinya pengaturan pemenang tender.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: ANALISIS AI -->
+            <div id="analisis" class="tab-content space-y-8">
+                <div class="bg-white rounded-[40px] p-8 lg:p-10 border border-slate-100 shadow-sm">
+                    <h2 class="text-2xl font-black text-slate-800 mb-8 tracking-tight">Deteksi Anomali AI Engine v2.5</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10" id="analisisGrid"></div>
+                </div>
+            </div>
+
+            <!-- TAB: BANTUAN -->
+            <div id="bantuan" class="tab-content space-y-8">
+                <div class="max-w-4xl mx-auto">
+                    <div class="text-center mb-12">
+                        <h2 class="text-3xl font-black text-slate-800 mb-4 tracking-tighter">Pusat Bantuan & Edukasi</h2>
+                        <p class="text-slate-500 font-bold">Panduan penggunaan sistem pengawasan terpadu</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:border-blue-200 transition-all cursor-pointer">
+                            <div class="bg-blue-50 text-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center mb-6"><i data-lucide="book-open"></i></div>
+                            <h4 class="font-black text-slate-800 mb-2">Panduan Pengguna</h4>
+                            <p class="text-sm text-slate-500 font-medium">Cara membaca data audit dan verifikasi blockchain.</p>
+                        </div>
+                        <div class="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm hover:border-emerald-200 transition-all cursor-pointer">
+                            <div class="bg-emerald-50 text-emerald-600 w-12 h-12 rounded-2xl flex items-center justify-center mb-6"><i data-lucide="shield-check"></i></div>
+                            <h4 class="font-black text-slate-800 mb-2">Keamanan Data</h4>
+                            <p class="text-sm text-slate-500 font-medium">Sistem enkripsi end-to-end pada setiap transaksi anggaran.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- UI ALERTS -->
+    <div id="alertContainer"></div>
+
+    <script>
+        // DATA MASTER
         const PROYEK_DATA = [
-            { id: 1, nama: "Jembatan Mahakam IV", kategori: "Infrastruktur", status: "Normal", progress: 85, anggaran: 120000000000, lokasi: "Kaltim", kordinat: [360, 160], anomali: 0.5, blockchainId: "0x7d2e...4a1", hargaPasar: 118000000000 },
-            { id: 2, nama: "Puskesmas Melati", kategori: "Kesehatan", status: "Waspada", progress: 40, anggaran: 2500000000, lokasi: "Jabar", kordinat: [150, 265], anomali: 15.2, blockchainId: "0x9a1c...2b8", hargaPasar: 2100000000 },
-            { id: 3, nama: "Buku Perpusnas", kategori: "Pendidikan", status: "Bahaya", progress: 10, anggaran: 15000000000, lokasi: "Jakarta", kordinat: [140, 255], anomali: 45.8, blockchainId: "0x3f5b...9d0", hargaPasar: 8500000000 },
-            { id: 4, nama: "Irigasi Baru", kategori: "Pertanian", status: "Normal", progress: 60, anggaran: 8000000000, lokasi: "Jateng", kordinat: [195, 275], anomali: 2.1, blockchainId: "0x8e4d...1c2", hargaPasar: 7800000000 },
-            { id: 5, nama: "GOR Medan", kategori: "Fasilitas", status: "Waspada", progress: 25, anggaran: 45000000000, lokasi: "Sumut", kordinat: [60, 100], anomali: 12.5, blockchainId: "0x2c9f...7e4", hargaPasar: 39000000000 },
-            { id: 6, nama: "RSUD Papua", kategori: "Kesehatan", status: "Normal", progress: 55, anggaran: 210000000000, lokasi: "Jayapura", kordinat: [550, 220], anomali: 1.2, blockchainId: "0x5e1a...1f9", hargaPasar: 208000000000 },
+            { id: 1, nama: "Jembatan Mahakam IV", kategori: "Infrastruktur", status: "Normal", progress: 85, anggaran: 120000000000, lokasi: "Kalimantan Timur", kordinat: [530, 210], anomali: 0.5, blockchainId: "0x7d2e...4a1", hargaPasar: 118000000000, vendor: "PT. Adi Karya", alasanAi: "Harga bahan baku sesuai dengan indeks harga konstruksi regional terkini.", foto: "🏗️", petugas: "Inspektur Sudirman", tglUpdate: "26 Des 2023" },
+            { id: 2, nama: "Puskesmas Melati", kategori: "Kesehatan", status: "Waspada", progress: 40, anggaran: 2500000000, lokasi: "Jawa Barat", kordinat: [205, 310], anomali: 15.2, blockchainId: "0x9a1c...2b8", hargaPasar: 2100000000, vendor: "CV. Bangun Pagi", alasanAi: "Terdapat kemiripan pola harga antara vendor ini dengan sub-kontraktor di proyek lain.", foto: "🏥", petugas: "Auditor Anita", tglUpdate: "24 Des 2023" },
+            { id: 3, nama: "Pengadaan Buku Perpusnas", kategori: "Pendidikan", status: "Bahaya", progress: 10, anggaran: 15000000000, lokasi: "DKI Jakarta", kordinat: [200, 290], anomali: 45.8, blockchainId: "0x3f5b...9d0", hargaPasar: 8500000000, vendor: "CV. Cetak Cepat", alasanAi: "Harga satuan buku di atas 45% rata-rata pasar nasional. Terdeteksi manipulasi spek.", foto: "📚", petugas: "Penyidik Bagas", tglUpdate: "20 Des 2023" },
+            { id: 4, nama: "Irigasi Desa Baru", kategori: "Pertanian", status: "Normal", progress: 60, anggaran: 8000000000, lokasi: "Jawa Tengah", kordinat: [235, 315], anomali: 2.1, blockchainId: "0x8e4d...1c2", hargaPasar: 7800000000, vendor: "PT. Sumber Air", alasanAi: "Alokasi biaya logistik terpantau efisien berdasarkan jarak lokasi.", foto: "🌾", petugas: "Pengawas Rina", tglUpdate: "27 Des 2023" },
+            { id: 5, nama: "GOR Medan Baru", kategori: "Fasilitas Publik", status: "Waspada", progress: 25, anggaran: 45000000000, lokasi: "Sumatera Utara", kordinat: [80, 110], anomali: 12.5, blockchainId: "0x2c9f...7e4", hargaPasar: 39000000000, vendor: "PT. Jaya Raya", alasanAi: "Progress fisik di lapangan (geotagging) tidak sesuai klaim penyerapan dana.", foto: "🏟️", petugas: "Tim Audit Wilayah I", tglUpdate: "25 Des 2023" },
+            { id: 6, nama: "RSUD Papua Barat", kategori: "Kesehatan", status: "Normal", progress: 55, anggaran: 210000000000, lokasi: "Manokwari", kordinat: [880, 240], anomali: 1.2, blockchainId: "0x5e1a...1f9", hargaPasar: 208000000000, vendor: "PT. Papua Sejahtera", alasanAi: "Audit lapangan menunjukkan kualitas beton sesuai standar SNI.", foto: "🏢", petugas: "Inspektur Lukas", tglUpdate: "26 Des 2023" },
+        ];
+
+        const APBN_DATA = [
+            { kementrian: "Kemen. PUPR", pagu: 146.9, realisasi: 112.4, color: "blue", ket: "Realisasi Sektor Konstruksi" },
+            { kementrian: "Kemen. Kesehatan", pagu: 178.7, realisasi: 145.2, color: "emerald", ket: "Realisasi Sektor Kesehatan" },
+            { kementrian: "Kemen. Pendidikan", pagu: 612.2, realisasi: 489.1, color: "indigo", ket: "Realisasi Sektor Pendidikan" },
+            { kementrian: "Kemen. Keuangan", pagu: 45.2, realisasi: 38.4, color: "slate", ket: "Realisasi Sektor Keuangan" },
+        ];
+
+        const RENCANA_PROYEK = [
+            { nama: "Pembangunan Tol Trans Papua Segmen 4", nilai: "Rp 3.2 T", tgl: "Jan 2024", risiko: "Rendah" },
+            { nama: "Digitalisasi Sekolah Menengah Timur", nilai: "Rp 450 M", tgl: "Feb 2024", risiko: "Tinggi (Pasokan)" },
+            { nama: "Pusat Riset Vaksin Nasional", nilai: "Rp 1.2 T", tgl: "Maret 2024", risiko: "Sedang" },
         ];
 
         const formatRupiah = (num) => "Rp " + (num / 1e9).toFixed(1) + " M";
 
-        function App() {
-            const [activeTab, setActiveTab] = useState('ringkasan');
-            const [selectedProyek, setSelectedProyek] = useState(null);
-            const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-            // Close modal/menu on tab change
-            useEffect(() => {
-                setIsMenuOpen(false);
-                window.scrollTo(0,0);
-            }, [activeTab]);
-
-            const NavItem = ({ id, label, icon }) => (
-                <button 
-                    onClick={() => setActiveTab(id)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all w-full ${
-                        activeTab === id 
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
-                        : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-                    }`}
-                >
-                    <Icon name={icon} size={20} />
-                    <span className="font-bold text-sm tracking-tight">{label}</span>
-                </button>
-            );
-
-            return (
-                <div className="min-h-screen flex flex-col lg:flex-row overflow-x-hidden">
-                    
-                    {/* MOBILE HEADER */}
-                    <div className="lg:hidden bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-600 p-2 rounded-lg text-white">
-                                <Icon name="ShieldCheck" size={20} />
-                            </div>
-                            <h1 className="font-black text-lg tracking-tighter text-slate-900">INTEGRITAS</h1>
-                        </div>
-                        <button 
-                            onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            className="p-2 text-slate-600 bg-slate-100 rounded-xl"
-                        >
-                            <Icon name={isMenuOpen ? "X" : "Menu"} size={24} />
-                        </button>
-                    </div>
-
-                    {/* DESKTOP SIDEBAR / MOBILE OVERLAY MENU */}
-                    <aside className={`
-                        fixed lg:sticky top-0 left-0 h-full bg-white border-r border-slate-200 z-[60] transition-all duration-300
-                        ${isMenuOpen ? 'w-72 translate-x-0' : '-translate-x-full lg:translate-x-0 w-72'}
-                    `}>
-                        <div className="p-8 hidden lg:flex items-center gap-4">
-                            <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-xl shadow-blue-100">
-                                <Icon name="ShieldCheck" size={24} />
-                            </div>
-                            <div>
-                                <h1 className="font-black text-xl tracking-tighter text-slate-900">INTEGRITAS</h1>
-                                <p className="text-[10px] text-blue-500 font-extrabold tracking-[0.2em] uppercase leading-none mt-1">Audit Nasional</p>
-                            </div>
-                        </div>
-
-                        <nav className="px-6 mt-4 lg:mt-8 space-y-2">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 mb-4">Menu Utama</p>
-                            <NavItem id="ringkasan" label="Ringkasan" icon="LayoutDashboard" />
-                            <NavItem id="geotagging" label="Peta Geotagging" icon="MapPin" />
-                            <NavItem id="analisis" label="AI Integrity" icon="Activity" />
-                        </nav>
-
-                        <div className="absolute bottom-8 left-0 w-full px-6">
-                            <div className="p-5 bg-slate-900 rounded-3xl text-white relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/20 blur-2xl" />
-                                <p className="text-[10px] font-black text-blue-400 uppercase mb-2 tracking-widest">Support</p>
-                                <p className="text-xs opacity-70 mb-4">Butuh bantuan teknis audit?</p>
-                                <button className="w-full py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all border border-white/10">Buka Tiket</button>
-                            </div>
-                        </div>
-                    </aside>
-
-                    {/* BACKDROP FOR MOBILE MENU */}
-                    {isMenuOpen && (
-                        <div 
-                            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[55] lg:hidden"
-                            onClick={() => setIsMenuOpen(false)}
-                        />
-                    )}
-
-                    {/* MAIN CONTENT AREA */}
-                    <main className="flex-1 w-full relative">
-                        {/* TOPBAR DESKTOP */}
-                        <div className="hidden lg:flex h-24 bg-white/80 backdrop-blur-md border-b border-slate-200 px-10 items-center justify-between sticky top-0 z-40">
-                            <h2 className="text-xl font-bold text-slate-800 capitalize tracking-tight">
-                                {activeTab.replace('ringkasan', 'Dashboard Overview')}
-                            </h2>
-                            <div className="flex items-center gap-4">
-                                <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-full text-[10px] font-black uppercase flex items-center gap-2 border border-emerald-100">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                    Live Database
-                                </div>
-                                <button className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-slate-600 transition-all">
-                                    <Icon name="Bell" size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* CONTENT WRAPPER */}
-                        <div className="p-6 lg:p-10 max-w-[1400px] mx-auto fade-enter-active">
-                            
-                            {/* TAB: RINGKASAN */}
-                            {activeTab === 'ringkasan' && (
-                                <div className="space-y-8">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                                        {[
-                                            { label: 'Total Diawasi', value: 'Rp 400.5 M', icon: 'Database', color: 'text-blue-600', bg: 'bg-blue-50' },
-                                            { label: 'Blok Blockchain', value: '5,821', icon: 'Fingerprint', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                                            { label: 'Potensi Markup', value: '18 Kasus', icon: 'AlertTriangle', color: 'text-amber-600', bg: 'bg-amber-50' },
-                                            { label: 'Akurasi AI', value: '99.9%', icon: 'ShieldCheck', color: 'text-emerald-600', bg: 'bg-emerald-50' }
-                                        ].map((stat, i) => (
-                                            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-start justify-between">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                                                    <h3 className="text-xl lg:text-2xl font-black text-slate-800 tracking-tight">{stat.value}</h3>
-                                                </div>
-                                                <div className={`p-3 rounded-2xl ${stat.bg} ${stat.color}`}>
-                                                    <Icon name={stat.icon} size={24} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                                            <div className="p-6 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                                <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">Daftar Proyek Berisiko</h3>
-                                                <button className="text-[11px] font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl">Lihat Semua</button>
-                                            </div>
-                                            <div className="overflow-x-auto hide-scrollbar">
-                                                <table className="w-full text-left">
-                                                    <thead className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                                                        <tr>
-                                                            <th className="px-6 py-4">Proyek</th>
-                                                            <th className="px-6 py-4">Anggaran</th>
-                                                            <th className="px-6 py-4">Markup</th>
-                                                            <th className="px-6 py-4">Status</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-50">
-                                                        {PROYEK_DATA.map(p => (
-                                                            <tr key={p.id} className="hover:bg-slate-50 transition-all cursor-pointer">
-                                                                <td className="px-6 py-4">
-                                                                    <p className="text-sm font-bold text-slate-800">{p.nama}</p>
-                                                                    <p className="text-[10px] text-slate-400 font-medium">{p.lokasi}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-xs font-bold">{formatRupiah(p.anggaran)}</td>
-                                                                <td className="px-6 py-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-[11px] font-black ${p.anomali > 20 ? 'text-red-500' : 'text-slate-500'}`}>{p.anomali}%</span>
-                                                                        <div className="w-12 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                                                            <div className={`h-full ${p.anomali > 20 ? 'bg-red-500' : 'bg-blue-500'}`} style={{width: `${p.anomali}%`}} />
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-4">
-                                                                    <span className={`text-[9px] font-black px-2 py-1 rounded-full uppercase ${
-                                                                        p.status === 'Bahaya' ? 'bg-red-50 text-red-600' : p.status === 'Waspada' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
-                                                                    }`}>{p.status}</span>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden group">
-                                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
-                                            <h3 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-6 flex items-center gap-2 relative z-10">
-                                                <Icon name="Activity" size={16} /> Audit Trail Terkini
-                                            </h3>
-                                            <div className="space-y-6 relative z-10">
-                                                {[1,2,3].map(i => (
-                                                    <div key={i} className="flex gap-4">
-                                                        <div className="w-[2px] bg-emerald-500/20 rounded-full relative">
-                                                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shadow-lg shadow-emerald-500/50"></div>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[11px] font-bold text-white leading-tight">Block #892{i} Verified</p>
-                                                            <p className="text-[9px] text-slate-500 mt-1 uppercase font-bold tracking-tighter">0x4a2...{i}f9 | 2m ago</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <button className="w-full mt-10 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest transition-all relative z-10">Explored Full Ledger</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB: GEOTAGGING (RESPONSIVE MAP) */}
-                            {activeTab === 'geotagging' && (
-                                <div className="flex flex-col lg:flex-row gap-8 h-auto lg:h-[calc(100vh-200px)]">
-                                    <div className="flex-1 bg-white rounded-[40px] border-4 border-white shadow-2xl relative overflow-hidden flex items-center justify-center p-4 lg:p-10 min-h-[400px] lg:min-h-0">
-                                        <div className="absolute top-6 left-6 z-20">
-                                            <div className="bg-white/90 backdrop-blur-lg shadow-xl p-4 rounded-3xl border border-slate-100 flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                                                    <Icon name="Map" size={20} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peta Pantauan</p>
-                                                    <p className="text-xs font-bold text-slate-800">Indeks Geospasial Nasional</p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* FLUID SVG MAP */}
-                                        <svg viewBox="0 0 600 350" className="w-full h-auto max-h-full drop-shadow-2xl">
-                                            <g fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1.5">
-                                                <path d="M40,110 L60,80 L100,100 L140,150 L120,190 L80,180 Z" />
-                                                <path d="M140,250 L200,250 L320,285 L300,305 L140,270 Z" />
-                                                <path d="M220,180 L230,140 L260,100 L320,100 L350,160 L330,220 L260,220 Z" />
-                                                <path d="M380,130 L410,110 L430,120 L420,160 L450,180 L410,210 L380,180 Z" />
-                                                <path d="M480,180 L520,150 L580,160 L590,220 L500,240 Z" />
-                                            </g>
-                                            {PROYEK_DATA.map(p => (
-                                                <g key={p.id} className="cursor-pointer group" onClick={() => setSelectedProyek(p)}>
-                                                    <circle 
-                                                        cx={p.kordinat[0]} 
-                                                        cy={p.kordinat[1]} 
-                                                        r={selectedProyek?.id === p.id ? "12" : "8"} 
-                                                        className={`transition-all duration-300 ${
-                                                            selectedProyek?.id === p.id 
-                                                            ? 'fill-blue-600 stroke-[6] stroke-blue-100' 
-                                                            : p.status === 'Bahaya' ? 'fill-red-500' : p.status === 'Waspada' ? 'fill-amber-500' : 'fill-emerald-500'
-                                                        }`}
-                                                    />
-                                                    {selectedProyek?.id === p.id && (
-                                                        <circle cx={p.kordinat[0]} cy={p.kordinat[1]} r="20" className="fill-blue-600/10 animate-pulse" />
-                                                    )}
-                                                </g>
-                                            ))}
-                                        </svg>
-                                    </div>
-
-                                    {/* DETAIL PANEL (RESPONSIVE) */}
-                                    <div className={`
-                                        lg:w-[400px] bg-white lg:rounded-[40px] p-8 shadow-2xl border border-slate-100 flex flex-col
-                                        ${selectedProyek ? 'block fixed lg:relative inset-x-0 bottom-0 lg:inset-auto z-[70] lg:z-10 rounded-t-[40px] lg:translate-y-0 transform mobile-modal-bottom' : 'hidden lg:flex'}
-                                    `}>
-                                        {selectedProyek ? (
-                                            <div className="flex-1">
-                                                <div className="flex justify-between items-center mb-8">
-                                                    <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full uppercase tracking-widest">{selectedProyek.kategori}</span>
-                                                    <button onClick={() => setSelectedProyek(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 lg:hidden">✕</button>
-                                                </div>
-                                                <h3 className="text-2xl font-black text-slate-800 leading-tight mb-2">{selectedProyek.nama}</h3>
-                                                <div className="flex items-center gap-2 text-slate-500 mb-8">
-                                                    <Icon name="MapPin" size={14} />
-                                                    <span className="text-xs font-bold">{selectedProyek.lokasi}, Indonesia</span>
-                                                </div>
-
-                                                <div className="space-y-6">
-                                                    <div className="bg-slate-50 p-5 rounded-[32px] border border-slate-100">
-                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Analisis AI V.4</p>
-                                                        <div className="flex justify-between items-center mb-3">
-                                                            <span className="text-xs font-bold text-slate-600">Potensi Markup</span>
-                                                            <span className={`text-lg font-black ${selectedProyek.anomali > 20 ? 'text-red-500' : 'text-blue-600'}`}>{selectedProyek.anomali}%</span>
-                                                        </div>
-                                                        <div className="w-full bg-white h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
-                                                            <div className={`h-full rounded-full ${selectedProyek.anomali > 20 ? 'bg-red-500' : 'bg-blue-600'}`} style={{width: `${selectedProyek.anomali}%`}} />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="bg-slate-900 p-5 rounded-[32px] text-white">
-                                                        <div className="flex items-center gap-3 mb-4">
-                                                            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                                                                <Icon name="History" size={16} />
-                                                            </div>
-                                                            <p className="text-[10px] font-black uppercase tracking-widest">Blockchain Verified</p>
-                                                        </div>
-                                                        <p className="text-[10px] font-mono opacity-40 break-all leading-relaxed bg-black/20 p-3 rounded-2xl border border-white/5">{selectedProyek.blockchainId}</p>
-                                                    </div>
-                                                </div>
-
-                                                <button className="w-full mt-10 py-5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-[32px] shadow-xl shadow-blue-200 transition-all text-xs uppercase tracking-[0.2em]">Verifikasi Lapangan</button>
-                                            </div>
-                                        ) : (
-                                            <div className="h-full flex flex-col items-center justify-center text-center px-10">
-                                                <div className="w-20 h-20 bg-slate-50 rounded-[35px] flex items-center justify-center text-slate-300 mb-8">
-                                                    <Icon name="Map" size={40} />
-                                                </div>
-                                                <p className="text-sm font-black text-slate-800 uppercase tracking-widest mb-3">Klik Titik Peta</p>
-                                                <p className="text-xs text-slate-400 font-medium leading-relaxed">Pilih salah satu proyek untuk mendapatkan detail audit trail dan geotagging real-time.</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* TAB: ANALISIS AI */}
-                            {activeTab === 'analisis' && (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                    <div className="bg-white rounded-[40px] p-8 lg:p-10 border border-slate-100 shadow-sm">
-                                        <div className="flex items-center gap-4 mb-10">
-                                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                                                <Icon name="TrendingUp" size={24} />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-black text-slate-800 text-lg tracking-tight leading-none uppercase tracking-widest text-sm">Price Anomaly Detection</h3>
-                                                <p className="text-xs text-slate-400 mt-1 font-bold">Perbandingan harga pasar vs nilai kontrak</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-6">
-                                            {PROYEK_DATA.slice(0,4).map(p => (
-                                                <div key={p.id} className="group p-6 bg-slate-50 rounded-[32px] border border-slate-100 hover:border-blue-200 transition-all cursor-pointer">
-                                                    <div className="flex justify-between items-start mb-4">
-                                                        <p className="text-sm font-black text-slate-800">{p.nama}</p>
-                                                        <span className={`text-[10px] font-black px-3 py-1 rounded-full ${p.anomali > 20 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                                            {p.anomali > 20 ? 'OVERPRICED' : 'MARKET PRICE'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex gap-8 mb-4">
-                                                        <div>
-                                                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Kontrak</p>
-                                                            <p className="text-sm font-black text-slate-700">{formatRupiah(p.anggaran)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Estimasi AI</p>
-                                                            <p className="text-sm font-black text-blue-600">{formatRupiah(p.hargaPasar)}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="w-full bg-white h-2 rounded-full overflow-hidden p-0.5">
-                                                        <div className="bg-blue-500 h-full rounded-full" style={{width: '75%'}} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-slate-900 rounded-[40px] p-8 lg:p-10 shadow-2xl relative overflow-hidden flex flex-col min-h-[500px]">
-                                        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/10 blur-[120px]" />
-                                        <div className="flex items-center gap-4 mb-10 relative z-10">
-                                            <div className="w-12 h-12 bg-white/5 text-emerald-400 rounded-2xl flex items-center justify-center border border-white/5">
-                                                <Icon name="Fingerprint" size={24} />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-black text-white text-lg tracking-tight leading-none uppercase tracking-widest text-sm">Blockchain Ledger</h3>
-                                                <p className="text-xs text-slate-500 mt-1 font-bold">Catatan transaksi tidak terhapuskan</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 flex-1 relative z-10">
-                                            {[1,2,3,4,5].map(i => (
-                                                <div key={i} className="flex items-center gap-4 bg-white/5 p-4 rounded-[24px] border border-white/5 hover:bg-white/10 transition-all group">
-                                                    <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-black text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">#{i}</div>
-                                                    <div className="flex-1">
-                                                        <p className="text-xs font-bold text-white uppercase tracking-wider">Hash Verified</p>
-                                                        <p className="text-[9px] font-mono text-slate-500 mt-0.5">0x{Math.random().toString(16).slice(2, 12)}...</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-[10px] font-bold text-slate-600 uppercase">10:4{i} AM</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="mt-8 p-6 bg-white/5 rounded-[32px] border border-white/5 relative z-10">
-                                            <p className="text-xs font-bold text-slate-300 leading-relaxed italic opacity-60">"Setiap data yang diunggah dikunci menggunakan algoritma konsensus Proof-of-Authority, memastikan transparansi mutlak."</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </main>
-
-                    {/* MOBILE BOTTOM NAV (Alternative to menu for quick access) */}
-                    <div className="lg:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 px-6 py-4 flex justify-between items-center z-50">
-                        {[
-                            { id: 'ringkasan', icon: 'LayoutDashboard' },
-                            { id: 'geotagging', icon: 'MapPin' },
-                            { id: 'analisis', icon: 'Activity' }
-                        ].map(tab => (
-                            <button 
-                                key={tab.id} 
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`p-3 rounded-2xl transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400'}`}
-                            >
-                                <Icon name={tab.icon} size={24} />
-                            </button>
-                        ))}
-                    </div>
+        function showAlert(msg, type='success') {
+            const id = Date.now();
+            const container = document.getElementById('alertContainer');
+            const color = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+            const html = `
+                <div id="alert-${id}" class="custom-alert ${color} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+                    <i data-lucide="${type === 'success' ? 'check-circle' : 'alert-triangle'}" class="w-5 h-5"></i>
+                    <p class="font-bold text-sm">${msg}</p>
                 </div>
-            );
+            `;
+            container.innerHTML += html;
+            lucide.createIcons();
+            setTimeout(() => {
+                const el = document.getElementById(`alert-${id}`);
+                if(el) el.remove();
+            }, 3000);
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // LOGIC: SWITCH TAB
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if(btn.getAttribute('data-tab') === tabId) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            document.getElementById('sidebar').classList.add('-translate-x-full');
+            window.scrollTo(0, 0);
+        }
+
+        // RENDER: RINGKASAN AUDIT
+        function renderAuditTable() {
+            const tbody = document.getElementById('auditTableBody');
+            tbody.innerHTML = PROYEK_DATA.map(p => `
+                <tr class="hover:bg-slate-50 transition-all cursor-pointer" onclick="switchTab('geotagging'); showGeoDetail(${p.id})">
+                    <td class="px-8 py-5">
+                        <p class="text-sm font-bold text-slate-800">${p.nama}</p>
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">${p.vendor}</p>
+                    </td>
+                    <td class="px-8 py-5 text-sm font-bold text-slate-600">${formatRupiah(p.anggaran)}</td>
+                    <td class="px-8 py-5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-black ${p.anomali > 20 ? 'text-red-500' : 'text-blue-600'}">${p.anomali}%</span>
+                            <div class="w-16 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full ${p.anomali > 20 ? 'bg-red-500' : 'bg-blue-600'}" style="width: ${p.anomali}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5 text-[11px] font-bold text-slate-400">${p.tglUpdate}</td>
+                </tr>
+            `).join('');
+        }
+
+        // RENDER: GEOTAGGING (PIN ICONS)
+        function renderGeotagging() {
+            const pinContainer = document.getElementById('mapPins');
+            const pinPath = "M12 21.7C12 21.7 20 14.3 20 8.5C20 4 16.4 0.5 12 0.5C7.6 0.5 4 4 4 8.5C4 14.3 12 21.7 12 21.7Z";
+            
+            pinContainer.innerHTML = PROYEK_DATA.map(p => {
+                const color = p.status === 'Bahaya' ? '#ef4444' : p.status === 'Waspada' ? '#f59e0b' : '#10b981';
+                return `
+                    <g class="pin-marker" transform="translate(${p.kordinat[0]-12}, ${p.kordinat[1]-22})" onclick="showGeoDetail(${p.id})">
+                        <path d="${pinPath}" fill="${color}" stroke="#fff" stroke-width="1.5" />
+                        <circle cx="12" cy="8.5" r="3" fill="#fff" />
+                    </g>
+                `;
+            }).join('');
+        }
+
+        function handleLaporanSubmit(e, proyekNama) {
+            e.preventDefault();
+            const textarea = e.target.querySelector('textarea');
+            if (textarea.value.trim().length < 10) {
+                showAlert('Mohon berikan keterangan yang lebih lengkap', 'error');
+                return;
+            }
+            showAlert(`Laporan penyimpangan untuk ${proyekNama} telah diterima anonim melalui Blockchain.`);
+            textarea.value = '';
+        }
+
+        function showGeoDetail(id) {
+            const p = PROYEK_DATA.find(x => x.id === id);
+            const detail = document.getElementById('geoDetail');
+            detail.classList.remove('hidden');
+            detail.innerHTML = `
+                <div class="flex justify-between mb-8 items-center">
+                    <span class="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest">${p.kategori}</span>
+                    <button class="p-2 hover:bg-slate-100 rounded-full" onclick="document.getElementById('geoDetail').classList.add('hidden')">✕</button>
+                </div>
+                
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center text-3xl shadow-sm">${p.foto}</div>
+                    <div>
+                        <h3 class="text-xl font-black text-slate-800 leading-tight">${p.nama}</h3>
+                        <p class="text-xs text-slate-400 font-bold">${p.lokasi}</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4 mb-8">
+                    <div class="flex justify-between text-xs font-bold border-b border-slate-50 pb-2">
+                        <span class="text-slate-400 uppercase">Vendor Utama</span>
+                        <span class="text-slate-800">${p.vendor}</span>
+                    </div>
+                    <div class="flex justify-between text-xs font-bold border-b border-slate-50 pb-2">
+                        <span class="text-slate-400 uppercase">Audit Lapangan</span>
+                        <span class="text-blue-600">${p.progress}% Selesai</span>
+                    </div>
+                </div>
+
+                <div class="p-6 bg-slate-50 rounded-[32px] border border-slate-100 mb-6">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="brain" class="w-4 h-4 text-blue-600"></i>
+                        <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Alasan Analisis AI</p>
+                    </div>
+                    <p class="text-xs font-bold text-slate-700 leading-relaxed">"${p.alasanAi}"</p>
+                </div>
+
+                <!-- FORM LAPORAN PENYIMPANGAN -->
+                <div class="bg-red-50 p-6 rounded-[32px] border border-red-100">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="megaphone" class="w-4 h-4 text-red-600"></i>
+                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest">Lapor Penyimpangan</p>
+                    </div>
+                    <form onsubmit="handleLaporanSubmit(event, '${p.nama}')" class="space-y-3">
+                        <textarea class="w-full bg-white border border-red-100 rounded-xl p-3 text-xs font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Tuliskan detail indikasi kecurangan di sini..." rows="3"></textarea>
+                        <button type="submit" class="w-full bg-red-600 text-white py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors">
+                            Kirim Laporan Anonim
+                        </button>
+                    </form>
+                    <p class="text-[9px] text-red-400 font-bold mt-3 text-center italic">Identitas Anda dilindungi oleh enkripsi Blockchain Nasional.</p>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        // RENDER: REALISASI APBN
+        function renderAPBN() {
+            const grid = document.getElementById('apbnGrid');
+            grid.innerHTML = APBN_DATA.map(item => {
+                const persen = (item.realisasi / item.pagu * 100).toFixed(1);
+                return `
+                    <div class="p-8 bg-white rounded-[32px] border border-slate-100 shadow-sm">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">${item.ket}</p>
+                        <h4 class="font-black text-slate-800 mb-6 text-lg tracking-tight">${item.kementrian}</h4>
+                        <div class="flex items-end gap-3 mb-6">
+                            <span class="text-3xl font-black text-slate-900 tracking-tighter">Rp ${item.realisasi} T</span>
+                            <span class="text-xs text-slate-400 font-bold mb-1.5">/ ${item.pagu} T</span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                            <div class="h-full bg-${item.color}-500 transition-all duration-1000" style="width: ${persen}%"></div>
+                        </div>
+                        <div class="mt-4 flex justify-between text-[10px] font-black text-slate-400 uppercase">
+                            <span>Penyerapan</span>
+                            <span class="text-${item.color}-600 font-black">${persen}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // RENDER: RENCANA PROYEK
+        function renderRencana() {
+            const list = document.getElementById('rencanaList');
+            list.innerHTML = RENCANA_PROYEK.map(r => `
+                <div class="flex items-center justify-between p-6 bg-slate-50 rounded-2xl border-l-4 ${r.risiko.includes('Tinggi') ? 'border-red-500' : 'border-blue-500'}">
+                    <div>
+                        <h5 class="text-sm font-bold text-slate-800">${r.nama}</h5>
+                        <div class="flex gap-4 mt-1">
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest"><i data-lucide="tag" class="w-3 h-3 inline mr-1"></i> ${r.nilai}</p>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest"><i data-lucide="calendar" class="w-3 h-3 inline mr-1"></i> ${r.tgl}</p>
+                        </div>
+                    </div>
+                    <span class="text-[9px] font-black px-3 py-1 rounded-full uppercase ${r.risiko.includes('Tinggi') ? 'bg-red-100 text-red-600' : 'bg-slate-200 text-slate-600'}">
+                        ${r.risiko}
+                    </span>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // RENDER: ANALISIS AI GRID
+        function renderAnalisisGrid() {
+            const grid = document.getElementById('analisisGrid');
+            grid.innerHTML = PROYEK_DATA.slice(0, 4).map(p => `
+                <div class="flex flex-col p-8 bg-slate-50 rounded-[40px] border border-slate-100">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <p class="text-[10px] font-black text-blue-600 uppercase mb-1 tracking-widest">Detail Temuan AI</p>
+                            <h4 class="text-lg font-black text-slate-800">${p.nama}</h4>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[10px] font-black px-3 py-1.5 rounded-xl uppercase ${p.anomali > 20 ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'}">
+                                ${p.anomali > 20 ? 'Anomali Terdeteksi' : 'Verifikasi OK'}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white p-6 rounded-3xl mb-6 shadow-sm">
+                        <p class="text-xs font-bold text-slate-600 leading-relaxed italic">"${p.alasanAi}"</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 bg-white/50 rounded-2xl border border-white">
+                            <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Selisih Harga</p>
+                            <p class="text-sm font-black text-slate-800">${p.anomali}% dari Pasar</p>
+                        </div>
+                        <div class="p-4 bg-white/50 rounded-2xl border border-white">
+                            <p class="text-[9px] font-black text-slate-400 uppercase mb-1">Status Keamanan</p>
+                            <p class="text-sm font-black text-slate-800">Terenkripsi</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // INITIALIZE
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            renderAuditTable();
+            renderGeotagging();
+            renderAPBN();
+            renderRencana();
+            renderAnalisisGrid();
+
+            document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            });
+        });
     </script>
 </body>
 </html>
